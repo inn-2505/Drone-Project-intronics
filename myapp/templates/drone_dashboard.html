@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Drone F722 Live Telemetry</title>
+    <style>
+        body { font-family: sans-serif; background: #1a1a2e; color: #fff; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { color: #00f2fe; text-align: center; }
+        table { width: 100%; border-collapse: collapse; background: #162447; margin-top: 20px; }
+        th, td { padding: 12px; border: 1px solid #1f4068; text-align: left; }
+        th { background: #1f4068; color: #00f2fe; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; }
+    </style>
+    <script>
+        // Auto-refresh the page every 2 seconds
+        setInterval(function(){
+            window.location.reload();
+        }, 2000);
+    </script>
+</head>
+<body>
+<div class="container">
+    <h1>🛸 Drone F722 Live Dashboard</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Flight Mode</th>
+                <th>Altitude</th>
+                <th>Speed</th>
+                <th>Coordinates</th>
+                <th>Battery</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in drone_logs %}
+            <tr>
+                <td>{{ log.timestamp|date:"H:i:s" }}</td>
+                <td><span class="badge {{ log.flight_mode }}">{{ log.flight_mode }}</span></td>
+                <td>{{ log.altitude }} m</td>
+                <td>{{ log.speed }} m/s</td>
+                <td>{{ log.latitude }}, {{ log.longitude }}</td>
+                <td>{{ log.battery_percentage }}% ({{ log.battery_voltage }}V)</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" style="text-align:center;">Waiting for data from Postman...</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+</body>
+</html>
