@@ -21,7 +21,7 @@ application = ProtocolTypeRouter({
     "http": get_asgi_application(),
     "websocket": AuthMiddlewareStack(
         URLRouter([
-            path("ws/drone/", DroneConsumer.as_asgi()),
+            path("ws/drone/control/", DroneConsumer.as_asgi()),
         ])
     ),
 })
