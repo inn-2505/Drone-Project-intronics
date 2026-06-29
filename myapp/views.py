@@ -6,30 +6,30 @@ from django.views.decorators.csrf import csrf_exempt
 from myapp.models import DroneCommand, DroneStatus
 import json
 
-# def send_command(request, cmd_text):
-#     # Create a new command entry in the database
-#     DroneCommand.objects.create(command=cmd_text, status="PENDING")
-#     return redirect('dashboard')
+def send_command(request, cmd_text):
+    # Create a new command entry in the database
+    DroneCommand.objects.create(command=cmd_text, status="PENDING")
+    return redirect('dashboard')
 
-# def get_command(request):
-#     # Fetch the latest pending command from the database
-#     pending_cmd = DroneCommand.objects.filter(status="PENDING").order_by('-timestamp').first()
+def get_command(request):
+    # Fetch the latest pending command from the database
+    pending_cmd = DroneCommand.objects.filter(status="PENDING").order_by('-timestamp').first()
     
-#     if pending_cmd:
-#         response_data = {
-#             "command": pending_cmd.command,
-#             "status": "NEW_COMMAND"
-#         }
-#         # Change status to SENT 
-#         pending_cmd.status = "SENT"
-#         pending_cmd.save()
-#     else:
-#         response_data = {
-#             "command": "NONE",
-#             "status": "NO_NEW_COMMAND"
-#         }
+    if pending_cmd:
+        response_data = {
+            "command": pending_cmd.command,
+            "status": "NEW_COMMAND"
+        }
+        # Change status to SENT 
+        pending_cmd.status = "SENT"
+        pending_cmd.save()
+    else:
+        response_data = {
+            "command": "NONE",
+            "status": "NO_NEW_COMMAND"
+        }
         
-#     return JsonResponse(response_data)
+    return JsonResponse(response_data)
 
 def dashboard(request):
     drone_logs = DroneStatus.objects.all()[:50]
