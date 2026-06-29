@@ -2,54 +2,118 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Drone F722 Live Telemetry</title>
+    <title>Drone F722 Live Telemetry & WebSocket Control</title>
     <style>
         body { font-family: sans-serif; background: #1a1a2e; color: #fff; padding: 20px; }
         .container { max-width: 1000px; margin: 0 auto; }
         h1 { color: #00f2fe; text-align: center; }
+        h2 { color: #00f2fe; margin-top: 0; font-size: 1.2rem; text-transform: uppercase; }
+        
+        /* Control Panel Styles */
+        .control-panel { background: #162447; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #1f4068; }
+        .btn-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
+        .btn { padding: 10px 20px; color: white; border: none; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+        .btn-blue { background: #0275d8; } .btn-blue:hover { background: #025aa5; }
+        .btn-orange { background: #f0ad4e; } .btn-orange:hover { background: #ec971f; }
+        .btn-green { background: #4e9f3d; } .btn-green:hover { background: #3e8030; }
+        .btn-red { background: #d9534f; } .btn-red:hover { background: #c9302c; }
+        
+        /* Connection Status Indicator */
+        .status-bar { display: inline-block; padding: 5px 10px; border-radius: 4px; font-weight: bold; margin-bottom: 15px; font-size: 0.85rem; }
+        .connected { background: #4e9f3d; color: #fff; }
+        .disconnected { background: #d9534f; color: #fff; }
+
+        .custom-cmd-form { display: flex; gap: 10px; align-items: center; margin-top: 15px; padding-top: 15px; border-top: 1px solid #1f4068; }
+        .input-cmd { background: #1a1a2e; border: 1px solid #1f4068; padding: 10px; color: #fff; border-radius: 4px; flex-grow: 1; font-size: 1rem; }
+        .btn-submit { background: #00f2fe; color: #1a1a2e; font-weight: bold; }
+        
         table { width: 100%; border-collapse: collapse; background: #162447; margin-top: 20px; }
         th, td { padding: 12px; border: 1px solid #1f4068; text-align: left; }
         th { background: #1f4068; color: #00f2fe; }
         .badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; }
     </style>
-    <script>
-        // Auto-refresh the page every 2 seconds
-        setInterval(function(){
-            window.location.reload();
-        }, 2000);
-    </script>
 </head>
 <body>
 <div class="container">
-    <h1>🛸 Drone F722 Live Dashboard</h1>
+    <h1>🛸 Drone F722 Live WebSocket Dashboard</h1>
+    
+    <div class="control-panel">
+        <h2>🕹️ Flight Control Panel</h2>
+        <div id="connectionStatus" class="status-bar disconnected">WebSocket: Disconnected</div>
+        
+        <p style="margin-top: 0; color: #aaa;">Last Clicked Command: <strong id="lastCmdText" style="color: #00f2fe;">NONE</strong></p>
+        
+        <div class="btn-group">
+            <button onclick="sendWebsocketCommand('TAKEOFF')" class="btn btn-blue">TAKEOFF</button>
+            <button onclick="sendWebsocketCommand('LAND')" class="btn btn-orange">LAND</button>
+            <button onclick="sendWebsocketCommand('RETURN_HOME')" class="btn btn-green">RETURN HOME</button>
+            <button onclick="sendWebsocketCommand('DISARM')" class="btn btn-red">EMERGENCY DISARM</button>
+        </div>
+        
+        <form onsubmit="submitCustomCommand(event)" class="custom-cmd-form">
+            <label style="font-weight: bold; color: #aaa;">Custom Command:</label>
+            <input type="text" id="customCmdInput" class="input-cmd" placeholder="e.g., SET_SPEED_10, FLIP_FRONT" autocomplete="off" required>
+            <button type="submit" class="btn btn-submit">SEND COMMAND</button>
+        </form>
+    </div>
+
     <table>
-        <thead>
-            <tr>
-                <th>Timestamp</th>
-                <th>Flight Mode</th>
-                <th>Altitude</th>
-                <th>Speed</th>
-                <th>Coordinates</th>
-                <th>Battery</th>
-            </tr>
-        </thead>
+        <thead><tr><th>Timestamp</th><th>Flight Mode</th><th>Altitude</th><th>Speed</th><th>Coordinates</th><th>Battery</th></tr></thead>
         <tbody>
             {% for log in drone_logs %}
             <tr>
                 <td>{{ log.timestamp|date:"H:i:s" }}</td>
                 <td><span class="badge {{ log.flight_mode }}">{{ log.flight_mode }}</span></td>
-                <td>{{ log.altitude }} m</td>
+                <td style="color: #00f2fe; font-weight: bold;">{{ log.altitude }} m</td>
                 <td>{{ log.speed }} m/s</td>
                 <td>{{ log.latitude }}, {{ log.longitude }}</td>
                 <td>{{ log.battery_percentage }}% ({{ log.battery_voltage }}V)</td>
             </tr>
             {% empty %}
-            <tr>
-                <td colspan="6" style="text-align:center;">Waiting for data from Postman...</td>
-            </tr>
+            <tr><td colspan="6" style="text-align:center; color: #aaa;">Waiting for data...</td></tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+<script>
+    // เริ่มต้นเชื่อมต่อท่อส่งข้อมูลแบบ WebSocket TCP
+    const socketUrl = 'ws://' + window.location.host + '/ws/drone/control/';
+    const droneSocket = new WebSocket(socketUrl);
+
+    // เมื่อเชื่อมต่อสำเร็จ
+    droneSocket.onopen = function(e) {
+        const statusDiv = document.getElementById('connectionStatus');
+        statusDiv.innerText = 'WebSocket: Connected (TCP Live)';
+        statusDiv.className = 'status-bar connected';
+    };
+
+    // เมื่อหลุดการเชื่อมต่อ
+    droneSocket.onclose = function(e) {
+        const statusDiv = document.getElementById('connectionStatus');
+        statusDiv.innerText = 'WebSocket: Disconnected';
+        statusDiv.className = 'status-bar disconnected';
+    };
+
+    // ฟังก์ชันยิงข้อมูลผ่าน WebSocket ทันทีเมื่อกดปุ่ม
+    function sendWebsocketCommand(cmd) {
+        if (droneSocket.readyState === WebSocket.OPEN) {
+            droneSocket.send(json = JSON.stringify({ 'command': cmd }));
+            document.getElementById('lastCmdText').innerText = cmd;
+        } else {
+            alert('WebSocket is not connected. Check your server.');
+        }
+    }
+
+    function submitCustomCommand(event) {
+        event.preventDefault();
+        const inputElement = document.getElementById('customCmdInput');
+        const cmdText = inputElement.value.trim();
+        if (cmdText) {
+            sendWebsocketCommand(cmdText);
+            inputElement.value = ''; // ล้างกล่องข้อความหลังจากส่งแล้ว
+        }
+    }
+</script>
 </body>
 </html>
