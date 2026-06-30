@@ -30,7 +30,6 @@ class DroneStatus(models.Model):
         return f"Drone_F722 - {self.flight_mode} at {self.timestamp}"
 
 class DroneCommand(models.Model):
-    # command (ARM, DISARM, TAKEOFF, LAND)
     command = models.CharField(max_length=50, default="NONE")
     # status of the command (PENDING, EXECUTED, FAILED)
     status = models.CharField(max_length=20, default="PENDING")

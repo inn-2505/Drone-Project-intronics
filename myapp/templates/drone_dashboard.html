@@ -25,12 +25,23 @@
 
         .custom-cmd-form { display: flex; gap: 10px; align-items: center; margin-top: 15px; padding-top: 15px; border-top: 1px solid #1f4068; }
         .input-cmd { background: #1a1a2e; border: 1px solid #1f4068; padding: 10px; color: #fff; border-radius: 4px; flex-grow: 1; font-size: 1rem; }
+        .input-cmd:focus { border-color: #00f2fe; outline: none; }
         .btn-submit { background: #00f2fe; color: #1a1a2e; font-weight: bold; }
-        
+        .btn-submit:hover { background: #00b8d4; }        
+
+        /* Table Styles */
         table { width: 100%; border-collapse: collapse; background: #162447; margin-top: 20px; }
         th, td { padding: 12px; border: 1px solid #1f4068; text-align: left; }
         th { background: #1f4068; color: #00f2fe; }
+
+        /* Status Badges */
         .badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; }
+        .STABILIZE { background: #0275d8; }
+        .ALT_HOLD { background: #f0ad4e; }
+        .LOITER { background: #4e9f3d; }
+        .RTL { background: #6f42c1; }
+        .ARM { background: #28a745; }
+        .DISARM { background: #dc3545; }
     </style>
 </head>
 <body>
@@ -58,7 +69,16 @@
     </div>
 
     <table>
-        <thead><tr><th>Timestamp</th><th>Flight Mode</th><th>Altitude</th><th>Speed</th><th>Coordinates</th><th>Battery</th></tr></thead>
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Flight Mode</th>
+                <th>Altitude</th>
+                <th>Speed</th>
+                <th>Coordinates</th>
+                <th>Battery</th>
+            </tr>
+        </thead>
         <tbody>
             {% for log in drone_logs %}
             <tr>
@@ -77,28 +97,28 @@
 </div>
 
 <script>
-    // เริ่มต้นเชื่อมต่อท่อส่งข้อมูลแบบ WebSocket TCP
+    // init WebSocket connection to the server
     const socketUrl = 'ws://' + window.location.host + '/ws/drone/control/';
     const droneSocket = new WebSocket(socketUrl);
 
-    // เมื่อเชื่อมต่อสำเร็จ
+    // when connection is established
     droneSocket.onopen = function(e) {
         const statusDiv = document.getElementById('connectionStatus');
         statusDiv.innerText = 'WebSocket: Connected (TCP Live)';
         statusDiv.className = 'status-bar connected';
     };
 
-    // เมื่อหลุดการเชื่อมต่อ
+    // when connection is closed
     droneSocket.onclose = function(e) {
         const statusDiv = document.getElementById('connectionStatus');
         statusDiv.innerText = 'WebSocket: Disconnected';
         statusDiv.className = 'status-bar disconnected';
     };
 
-    // ฟังก์ชันยิงข้อมูลผ่าน WebSocket ทันทีเมื่อกดปุ่ม
+    // function to send data via WebSocket immediately when button is clicked
     function sendWebsocketCommand(cmd) {
         if (droneSocket.readyState === WebSocket.OPEN) {
-            droneSocket.send(json = JSON.stringify({ 'command': cmd }));
+            droneSocket.send(JSON.stringify({ 'command': cmd }));
             document.getElementById('lastCmdText').innerText = cmd;
         } else {
             alert('WebSocket is not connected. Check your server.');
@@ -111,7 +131,7 @@
         const cmdText = inputElement.value.trim();
         if (cmdText) {
             sendWebsocketCommand(cmdText);
-            inputElement.value = ''; // ล้างกล่องข้อความหลังจากส่งแล้ว
+            inputElement.value = ''; // clear input after sending
         }
     }
 </script>
