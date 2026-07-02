@@ -52,7 +52,7 @@
         <h2>🕹️ Flight Control Panel</h2>
         <div id="connectionStatus" class="status-bar disconnected">WebSocket: Disconnected</div>
         
-        <p style="margin-top: 0; color: #aaa;">Last Clicked Command: <strong id="lastCmdText" style="color: #00f2fe;">NONE</strong></p>
+        <p style="margin-top: 0; color: #aaa;">Last Clicked Command: <strong id="lastCmdText" style="color: #00f2fe;">{{ last_command.command|default:"NONE" }}</strong></p>
         
         <div class="btn-group">
             <button onclick="sendWebsocketCommand('TAKEOFF')" class="btn btn-blue">TAKEOFF</button>

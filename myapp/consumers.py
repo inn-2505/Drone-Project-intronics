@@ -38,6 +38,13 @@ class DroneConsumer(AsyncWebsocketConsumer):
             'type': 'LIVE_COMMAND'
         }))
 
+    async def drone_telemetry_message(self, event):
+        data = event['data']
+        await self.send(text_data=json.dumps({
+            'type': 'TELEMETRY',
+            'data': data
+        }))    
+
     @database_sync_to_async
     def save_command(self, command_text):
         # บันทึกคำสั่งลงตาราง drone_f722_command โดยกำหนดสถานะเริ่มต้นเป็น PENDING (หรือ SENT ตามต้องการ)
