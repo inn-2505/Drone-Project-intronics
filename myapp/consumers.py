@@ -1,6 +1,9 @@
 import json
+import socket
+import asyncio
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
+from django.core.cache import cache
 from myapp.models import DroneCommand
 
 class DroneConsumer(AsyncWebsocketConsumer):
@@ -21,22 +24,33 @@ class DroneConsumer(AsyncWebsocketConsumer):
             # Save the command to the database
             await self.save_command(command)
         
-        # send the command to the ESP32 via WebSocket
-        await self.channel_layer.group_send(
-            self.group_name,
-            {
-                'type': 'drone_command_message',
-                'command': command
-            }
-        )
+            # send the command to ESP32 via UDP
+            await self.send_udp_packet(command)
 
-    # send data to ESP32
-    async def drone_command_message(self, event):
-        command = event['command']
+    # send UDP packet to ESP32
+    async def send_udp_packet(self, command):
+        ESP32_IP = cache.get('esp32_ip') or "192.168.1.198"
+        ESP32_PORT = 1234    
+        
+        # send UDP message to ESP32
+        def send_udp():
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # SOCK_DGRAM = UDP
+            message = json.dumps({
+                'command': command,
+                'type': 'LIVE_COMMAND'
+            }).encode('utf-8')
+            sock.sendto(message, (ESP32_IP, ESP32_PORT))
+            sock.close()
+            
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, send_udp)    
+
+    async def drone_telemetry_message(self, event):
+        data = event['data']
         await self.send(text_data=json.dumps({
-            'command': command,
-            'type': 'LIVE_COMMAND'
-        }))
+            'type': 'TELEMETRY',
+            'data': data
+        }))    
 
     @database_sync_to_async
     def save_command(self, command_text):

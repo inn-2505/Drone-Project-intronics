@@ -17,11 +17,6 @@
         .btn-orange { background: #f0ad4e; } .btn-orange:hover { background: #ec971f; }
         .btn-green { background: #4e9f3d; } .btn-green:hover { background: #3e8030; }
         .btn-red { background: #d9534f; } .btn-red:hover { background: #c9302c; }
-        
-        /* Connection Status Indicator */
-        .status-bar { display: inline-block; padding: 5px 10px; border-radius: 4px; font-weight: bold; margin-bottom: 15px; font-size: 0.85rem; }
-        .connected { background: #4e9f3d; color: #fff; }
-        .disconnected { background: #d9534f; color: #fff; }
 
         .custom-cmd-form { display: flex; gap: 10px; align-items: center; margin-top: 15px; padding-top: 15px; border-top: 1px solid #1f4068; }
         .input-cmd { background: #1a1a2e; border: 1px solid #1f4068; padding: 10px; color: #fff; border-radius: 4px; flex-grow: 1; font-size: 1rem; }
@@ -50,15 +45,14 @@
     
     <div class="control-panel">
         <h2>🕹️ Flight Control Panel</h2>
-        <div id="connectionStatus" class="status-bar disconnected">WebSocket: Disconnected</div>
         
         <p style="margin-top: 0; color: #aaa;">Last Clicked Command: <strong id="lastCmdText" style="color: #00f2fe;">NONE</strong></p>
         
         <div class="btn-group">
-            <button onclick="sendWebsocketCommand('TAKEOFF')" class="btn btn-blue">TAKEOFF</button>
-            <button onclick="sendWebsocketCommand('LAND')" class="btn btn-orange">LAND</button>
-            <button onclick="sendWebsocketCommand('RETURN_HOME')" class="btn btn-green">RETURN HOME</button>
-            <button onclick="sendWebsocketCommand('DISARM')" class="btn btn-red">EMERGENCY DISARM</button>
+            <button onclick="sendUdpCommand('TAKEOFF')" class="btn btn-blue">TAKEOFF</button>
+            <button onclick="sendUdpCommand('LAND')" class="btn btn-orange">LAND</button>
+            <button onclick="sendUdpCommand('RETURN_HOME')" class="btn btn-green">RETURN HOME</button>
+            <button onclick="sendUdpCommand('DISARM')" class="btn btn-red">EMERGENCY DISARM</button>
         </div>
         
         <form onsubmit="submitCustomCommand(event)" class="custom-cmd-form">
@@ -97,32 +91,29 @@
 </div>
 
 <script>
-    // init WebSocket connection to the server
-    const socketUrl = 'ws://' + window.location.host + '/ws/drone/control/';
-    const droneSocket = new WebSocket(socketUrl);
-
-    // when connection is established
-    droneSocket.onopen = function(e) {
-        const statusDiv = document.getElementById('connectionStatus');
-        statusDiv.innerText = 'WebSocket: Connected (TCP Live)';
-        statusDiv.className = 'status-bar connected';
-    };
-
-    // when connection is closed
-    droneSocket.onclose = function(e) {
-        const statusDiv = document.getElementById('connectionStatus');
-        statusDiv.innerText = 'WebSocket: Disconnected';
-        statusDiv.className = 'status-bar disconnected';
-    };
-
-    // function to send data via WebSocket immediately when button is clicked
-    function sendWebsocketCommand(cmd) {
-        if (droneSocket.readyState === WebSocket.OPEN) {
-            droneSocket.send(JSON.stringify({ 'command': cmd }));
+    // send UDP command to Django backend 
+    function sendUdpCommand(cmd) {
+        fetch('/api/command/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',                
+            },
+            body: JSON.stringify({ 'command': cmd })
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw new Error(err.message); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Success:', data);
             document.getElementById('lastCmdText').innerText = cmd;
-        } else {
-            alert('WebSocket is not connected. Check your server.');
-        }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to send command: ' + error.message);
+        });
     }
 
     function submitCustomCommand(event) {
@@ -130,7 +121,7 @@
         const inputElement = document.getElementById('customCmdInput');
         const cmdText = inputElement.value.trim();
         if (cmdText) {
-            sendWebsocketCommand(cmdText);
+            sendUdpCommand(cmdText);
             inputElement.value = ''; // clear input after sending
         }
     }

@@ -22,5 +22,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.dashboard, name='dashboard'),
     path('api/data/', views.receive_data, name='receive_data'),
-    path('api/command/', views.get_command, name='get_command'),
+    path('api/command/', views.send_udp_command, name='send_udp_command'),
 ]
