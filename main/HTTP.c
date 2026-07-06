@@ -17,9 +17,10 @@
 
 static const char *TAG = "NETWORKCONTROL";
 
-char command_mode[16] = "command";
-char type[32] = "READY";
-
+//char command_mode[16] = "command";
+//char type[32] = "READY";
+float latitude = 0.0;
+float longitude = 0.0;
 
 // HTTP Event Handler 
 static esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
@@ -214,28 +215,40 @@ void udp_receiver_task(void *pvParameters)
                 
                 if (root != NULL) {
                     // 2. ดึงค่าแต่ละ Key ออกมา
-                    cJSON *command_item = cJSON_GetObjectItem(root, "command");
-                    cJSON *type_item = cJSON_GetObjectItem(root, "type");
+                    cJSON *latitude_item = cJSON_GetObjectItem(root, "latitude");
+                    cJSON *longitude_item = cJSON_GetObjectItem(root, "longitude");
 
-                    // 3. เช็คเงื่อนไข: คราวนี้ต้องเป็น String ทั้ง 3 ตัวเลย (cJSON_IsString)
-                    if (cJSON_IsString(command_item) && cJSON_IsString(type_item)) {
+                    // 1. เช็คก่อนว่าดึง Item สำเร็จ (ไม่เป็น NULL)
+                    if (latitude_item != NULL && longitude_item != NULL) {
                         
-                        // 🚀 อัปเดตข้อมูลหลัก (Global Variables) ด้วยการ Copy สตริงทันที!
-                        strncpy(command_mode, command_item->valuestring, sizeof(command_mode) - 1);
-                        strncpy(type, type_item->valuestring, sizeof(type) - 1);
+                        // 2. ถ้าเพื่อนส่งมาเป็น Number (ปกติ)
+                        if (cJSON_IsNumber(latitude_item) && cJSON_IsNumber(longitude_item)) {
+                            latitude  = (float)latitude_item->valuedouble;
+                            longitude = (float)longitude_item->valuedouble;
+                        } 
+                        // 3. ถ้าเพื่อนดื้อส่งมาเป็น String (มี "" ครอบ) ให้แปลงข้อความเป็นตัวเลขด้วย atof()
+                        else if (cJSON_IsString(latitude_item) && cJSON_IsString(longitude_item)) {
+                            latitude  = (float)atof(latitude_item->valuestring);
+                            longitude = (float)atof(longitude_item->valuestring);
+                        } 
+                        else {
+                            ESP_LOGE(TAG, "Data type is neither Number nor String!");
+                            // สามารถจัดการ error ตรงนี้เพิ่มได้
+                        }
                         
+                        // 🚀 ทำงานต่อเมื่อได้ค่ามาแล้ว
                         ESP_LOGW(TAG, "🔥 COMMAND APPLIED!");
-                        ESP_LOGW(TAG, "command: %s | type: %s ", command_mode, type);
-                        
-                    } else {
-                        ESP_LOGE(TAG, "JSON format invalid! Missing fields or wrong data types (Must be all strings).");
-                    }
+                        ESP_LOGW(TAG, "latitude: %.4f | longitude: %.4f ", latitude, longitude);
 
-                    // 4. สั่งคืนหน่วยความจำให้ระบบ
+                    } else {
+                        ESP_LOGE(TAG, "JSON format invalid! Missing 'latitude' or 'longitude' keys.");
+                    }
+                    // อย่าลืมลบ object เพื่อคืน Memory
                     cJSON_Delete(root);
-                    
-                } else {
-                    ESP_LOGE(TAG, "Error parsing invalid JSON text.");
+                } 
+                else 
+                {
+                    ESP_LOGE(TAG, "JSON parsing error: invalid JSON format");
                 }
             }
         }
