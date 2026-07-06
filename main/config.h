@@ -15,7 +15,7 @@
 #define RXD_PIN             (GPIO_NUM_5)         
 #define BUF_SIZE            (1024)        
 
-#define UDP_PORT 12345
+#define UDP_PORT 1234
 
 #define RED GPIO_NUM_21
 

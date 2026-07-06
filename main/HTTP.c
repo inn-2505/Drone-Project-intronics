@@ -17,9 +17,9 @@
 
 static const char *TAG = "NETWORKCONTROL";
 
-char flight_mode[16] = "GUIDED";
-char current_status[32] = "READY";
-char msg_timestamp[32] = "2026-07-03:15.00.00";
+char command_mode[16] = "command";
+char type[32] = "READY";
+
 
 // HTTP Event Handler 
 static esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
@@ -214,20 +214,18 @@ void udp_receiver_task(void *pvParameters)
                 
                 if (root != NULL) {
                     // 2. ดึงค่าแต่ละ Key ออกมา
-                    cJSON *mode_item = cJSON_GetObjectItem(root, "flight_mode");
-                    cJSON *status_item = cJSON_GetObjectItem(root, "status");
-                    cJSON *time_item = cJSON_GetObjectItem(root, "timestamp"); // 👈 รับค่าที่เป็นข้อความวันที่
+                    cJSON *command_item = cJSON_GetObjectItem(root, "command");
+                    cJSON *type_item = cJSON_GetObjectItem(root, "type");
 
                     // 3. เช็คเงื่อนไข: คราวนี้ต้องเป็น String ทั้ง 3 ตัวเลย (cJSON_IsString)
-                    if (cJSON_IsString(mode_item) && cJSON_IsString(status_item) && cJSON_IsString(time_item)) {
+                    if (cJSON_IsString(command_item) && cJSON_IsString(type_item)) {
                         
                         // 🚀 อัปเดตข้อมูลหลัก (Global Variables) ด้วยการ Copy สตริงทันที!
-                        strncpy(flight_mode, mode_item->valuestring, sizeof(flight_mode) - 1);
-                        strncpy(current_status, status_item->valuestring, sizeof(current_status) - 1);
-                        strncpy(msg_timestamp, time_item->valuestring, sizeof(msg_timestamp) - 1); // 👈 ก๊อปปี้ข้อความวันที่ลงตัวแปรหลัก
+                        strncpy(command_mode, command_item->valuestring, sizeof(command_mode) - 1);
+                        strncpy(type, type_item->valuestring, sizeof(type) - 1);
                         
                         ESP_LOGW(TAG, "🔥 COMMAND APPLIED!");
-                        ESP_LOGW(TAG, "Mode: %s | Status: %s | Time: %s", flight_mode, current_status, msg_timestamp);
+                        ESP_LOGW(TAG, "command: %s | type: %s ", command_mode, type);
                         
                     } else {
                         ESP_LOGE(TAG, "JSON format invalid! Missing fields or wrong data types (Must be all strings).");
