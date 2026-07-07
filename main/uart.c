@@ -30,7 +30,7 @@ void init_uart(void) {
 }
 
 // Send a UART message
-static void tx_task()
+void tx_task(void *pvParameters)
 {
     int tx_bytes = 0;
     char *tx_data = "Hello from ESP32 ...\r\n"; // String to be send
@@ -43,5 +43,21 @@ static void tx_task()
         printf("Transmit (%d bytes): %s", tx_bytes, tx_data);
         vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
+}
+
+void rx_task(void* pvParameters)
+{
+    esp_log_level_set(TAG ,ESP_LOG_INFO);
+    uint8_t* rx_data = (uint8_t*) malloc(BUF_SIZE+1);
+    while(1){
+        const int rxBytes = uart_read_bytes(UART_PORT_NUM, rx_data, BUF_SIZE, 500/portTICK_PERIOD_MS);
+        if (rxBytes > 0){
+            rx_data[rxBytes] = '\0';
+            ESP_LOGI(TAG, "READ %d bytes: '%s'",rxBytes, rx_data);
+        
+        }
+        
+    }
+    free(rx_data);
 }
 

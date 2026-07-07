@@ -1,6 +1,7 @@
-#ifndef Wifi_H
-#define Wifi_H
+#ifndef uart_H
+#define uart_H
 
 void init_uart(void);
-static void tx_task();
+void tx_task(void *pvParameters);
+void rx_task(void* pvParameters);
 #endif

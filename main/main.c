@@ -39,10 +39,12 @@ void app_main(void)
 
     // Wi-Fi & UART
     wifi_init_sta();
-    //init_uart();
+    init_uart();
 
     // Task UART , HTTP POST  
-    //xTaskCreate(tx_task, "uart_tx_task", 1024 * 2, NULL, configMAX_PRIORITIES - 1, NULL);
+   
     xTaskCreate(http_sender_task, "http_sender_task", 8192, NULL, 5, NULL); // เพิ่ม Stack Size เป็น 8KB เนื่องจาก HTTP Client ใช้ RAM ค่อนข้างเยอะ
     xTaskCreate(udp_receiver_task, "udp_receiver_task", 4096, NULL, 5, NULL);
+    xTaskCreate(tx_task, "uart_tx_task", 1024 * 2, NULL,5, NULL);
+    xTaskCreate(rx_task, "uart_rx_task",1024 * 2, NULL,6,NULL);
 }
