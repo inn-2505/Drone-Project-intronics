@@ -1,43 +1,15 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Drone F722 Live Telemetry & WebSocket Control</title>
-    <style>
-        body { font-family: sans-serif; background: #1a1a2e; color: #fff; padding: 20px; }
-        .container { max-width: 1000px; margin: 0 auto; }
-        h1 { color: #00f2fe; text-align: center; }
-        h2 { color: #00f2fe; margin-top: 0; font-size: 1.2rem; text-transform: uppercase; }
-        
-        /* Control Panel Styles */
-        .control-panel { background: #162447; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #1f4068; }
-        .btn-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
-        .btn { padding: 10px 20px; color: white; border: none; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 1rem; }
-        .btn-blue { background: #0275d8; } .btn-blue:hover { background: #025aa5; }
-        .btn-orange { background: #f0ad4e; } .btn-orange:hover { background: #ec971f; }
-        .btn-green { background: #4e9f3d; } .btn-green:hover { background: #3e8030; }
-        .btn-red { background: #d9534f; } .btn-red:hover { background: #c9302c; }
+    <link rel="stylesheet" href="{% static 'css/drone_dashboard.css' %}" />
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-        .custom-cmd-form { display: flex; gap: 10px; align-items: center; margin-top: 15px; padding-top: 15px; border-top: 1px solid #1f4068; }
-        .input-cmd { background: #1a1a2e; border: 1px solid #1f4068; padding: 10px; color: #fff; border-radius: 4px; flex-grow: 1; font-size: 1rem; }
-        .input-cmd:focus { border-color: #00f2fe; outline: none; }
-        .btn-submit { background: #00f2fe; color: #1a1a2e; font-weight: bold; }
-        .btn-submit:hover { background: #00b8d4; }        
-
-        /* Table Styles */
-        table { width: 100%; border-collapse: collapse; background: #162447; margin-top: 20px; }
-        th, td { padding: 12px; border: 1px solid #1f4068; text-align: left; }
-        th { background: #1f4068; color: #00f2fe; }
-
-        /* Status Badges */
-        .badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; }
-        .STABILIZE { background: #0275d8; }
-        .ALT_HOLD { background: #f0ad4e; }
-        .LOITER { background: #4e9f3d; }
-        .RTL { background: #6f42c1; }
-        .ARM { background: #28a745; }
-        .DISARM { background: #dc3545; }
-    </style>
 </head>
 <body>
 <div class="container">
@@ -49,17 +21,17 @@
         <p style="margin-top: 0; color: #aaa;">Last Clicked Command: <strong id="lastCmdText" style="color: #00f2fe;">NONE</strong></p>
         
         <div class="btn-group">
-            <button onclick="sendUdpCommand('TAKEOFF')" class="btn btn-blue">TAKEOFF</button>
-            <button onclick="sendUdpCommand('LAND')" class="btn btn-orange">LAND</button>
-            <button onclick="sendUdpCommand('RETURN_HOME')" class="btn btn-green">RETURN HOME</button>
-            <button onclick="sendUdpCommand('DISARM')" class="btn btn-red">EMERGENCY DISARM</button>
+            <button onclick="sendUdpCommand('GOTO', 13.7563, 100.5018)" class="btn btn-blue">📍 Bangkok</button>
+            <button onclick="sendUdpCommand('GOTO', 18.7883, 98.9853)" class="btn btn-green">📍 Chiang Mai</button>
+            <button onclick="sendUdpCommand('GOTO', 7.8804, 98.3923)" class="btn btn-orange">📍 Phuket</button>
+            <button onclick="sendUdpCommand('GOTO', 12.9236, 100.8825)" class="btn btn-red">📍 Pattaya</button>
         </div>
-        
-        <form onsubmit="submitCustomCommand(event)" class="custom-cmd-form">
-            <label style="font-weight: bold; color: #aaa;">Custom Command:</label>
-            <input type="text" id="customCmdInput" class="input-cmd" placeholder="e.g., SET_SPEED_10, FLIP_FRONT" autocomplete="off" required>
-            <button type="submit" class="btn btn-submit">SEND COMMAND</button>
-        </form>
+
+        <div style="border-top: 1px solid #1f4068; margin: 25px 0; padding-top: 20px;">
+            <h2 style="color: #00f2fe; margin-top: 0; font-size: 1.2rem; text-transform: uppercase;">🗺️ Live Map</h2>
+        </div>
+
+        <div id="drone-map" style="height: 400px; border-radius: 8px; margin-bottom: 25px;"></div>
     </div>
 
     <table>
@@ -89,42 +61,6 @@
         </tbody>
     </table>
 </div>
-
-<script>
-    // send UDP command to Django backend 
-    function sendUdpCommand(cmd) {
-        fetch('/api/command/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',                
-            },
-            body: JSON.stringify({ 'command': cmd })
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(err => { throw new Error(err.message); });
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Success:', data);
-            document.getElementById('lastCmdText').innerText = cmd;
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Failed to send command: ' + error.message);
-        });
-    }
-
-    function submitCustomCommand(event) {
-        event.preventDefault();
-        const inputElement = document.getElementById('customCmdInput');
-        const cmdText = inputElement.value.trim();
-        if (cmdText) {
-            sendUdpCommand(cmdText);
-            inputElement.value = ''; // clear input after sending
-        }
-    }
-</script>
+<script src="{% static 'js/drone_dashboard.js' %}" defer></script>
 </body>
 </html>

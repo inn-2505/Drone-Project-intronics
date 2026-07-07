@@ -31,9 +31,9 @@ class DroneStatus(models.Model):
 
 class DroneCommand(models.Model):
     command = models.CharField(max_length=50, default="NONE")
-    # status of the command (PENDING, EXECUTED, FAILED)
-    status = models.CharField(max_length=20, default="PENDING")
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     timestamp = models.DateTimeField(auto_now=True)
-
+    
     class Meta:
         db_table = 'drone_f722_command'    

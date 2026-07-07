@@ -19,16 +19,16 @@ class DroneConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         data = json.loads(text_data)
         command = data.get('command')
-
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
         if command:
             # Save the command to the database
             await self.save_command(command)
-        
             # send the command to ESP32 via UDP
-            await self.send_udp_packet(command)
+            await self.send_udp_packet(latitude, longitude)
 
     # send UDP packet to ESP32
-    async def send_udp_packet(self, command):
+    async def send_udp_packet(self, latitude, longitude):
         ESP32_IP = cache.get('esp32_ip') or "192.168.1.198"
         ESP32_PORT = 1234    
         
@@ -36,8 +36,8 @@ class DroneConsumer(AsyncWebsocketConsumer):
         def send_udp():
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # SOCK_DGRAM = UDP
             message = json.dumps({
-                'command': command,
-                'type': 'LIVE_COMMAND'
+                'latitude': latitude,
+                'longitude': longitude
             }).encode('utf-8')
             sock.sendto(message, (ESP32_IP, ESP32_PORT))
             sock.close()

@@ -76,13 +76,20 @@ def send_udp_command(request):
             body = json.loads(request.body)
             command_text = body.get('command')
             
+            latitude = body.get('latitude')
+            longitude = body.get('longitude')
+
             if not command_text:
                 return JsonResponse({'status': 'error', 'message': 'Missing command'}, status=400)
             
-            # 1. บันทึกคำสั่งควบคุมลง PostgreSQL
-            DroneCommand.objects.create(command=command_text, status="PENDING")
+            # save command to PostgreSQL for logging
+            DroneCommand.objects.create(
+                command=command_text,
+                latitude=latitude,
+                longitude=longitude
+            )
             
-            # 2. ดึงหมายเลข IP ล่าสุดของ ESP32 ที่เราจำไว้จากใน Cache
+            # pull ESP32 IP from cache
             esp_ip = cache.get('esp32_ip')
             
             if not esp_ip:
@@ -91,11 +98,11 @@ def send_udp_command(request):
                     'message': 'Cannot send UDP. ESP32 IP not found in cache. Please wait for drone telemetry first.'
                 }, status=400)
             
-            # 3. เริ่มกระบวนการยิง UDP ข้ามระบบเน็ตเวิร์กหาตัวบอร์ด
+            # send UDP command to ESP32
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             payload = json.dumps({
-                "command": command_text,
-                "type": "LIVE_COMMAND"
+                "latitude": latitude,
+                "longitude": longitude
             })
             
             sock.sendto(payload.encode('utf-8'), (esp_ip, ESP32_UDP_PORT))
