@@ -15,7 +15,7 @@ h2 { color: #00f2fe; margin-top: 0; font-size: 1.2rem; text-transform: uppercase
 
 .btn-recenter {
     position: absolute;
-    top: 10px;
+    bottom: 10px;
     right: 10px;
     z-index: 1000; 
     background: #ffffff;
