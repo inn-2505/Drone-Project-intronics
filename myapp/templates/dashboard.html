@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Drone F722 Live Telemetry & WebSocket Control</title>
-    <link rel="stylesheet" href="{% static 'css/drone_dashboard.css' %}" />
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}" />
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <!-- Leaflet JS -->
@@ -31,7 +31,11 @@
             <h2 style="color: #00f2fe; margin-top: 0; font-size: 1.2rem; text-transform: uppercase;">🗺️ Live Map</h2>
         </div>
 
-        <div id="drone-map" style="height: 400px; border-radius: 8px; margin-bottom: 25px;"></div>
+        <div class="map-wrapper" style="position: relative;"></div>
+            <div id="drone-map" style="height: 400px; border-radius: 8px; margin-bottom: 25px;"></div>
+            
+            <button onclick="recenterMap()" class="btn-recenter">🎯 Back to Drone</button>
+        </div>
     </div>
 
     <table>
@@ -48,7 +52,7 @@
         <tbody>
             {% for log in drone_logs %}
             <tr>
-                <td>{{ log.timestamp|date:"H:i:s" }}</td>
+                <td>{{ log.timestamp|date:"d/m/Y H:i:s" }}</td>
                 <td><span class="badge {{ log.flight_mode }}">{{ log.flight_mode }}</span></td>
                 <td style="color: #00f2fe; font-weight: bold;">{{ log.altitude }} m</td>
                 <td>{{ log.speed }} m/s</td>
@@ -61,6 +65,6 @@
         </tbody>
     </table>
 </div>
-<script src="{% static 'js/drone_dashboard.js' %}" defer></script>
+<script src="{% static 'js/dashboard.js' %}" defer></script>
 </body>
 </html>

@@ -1,26 +1,53 @@
 import json
 import socket
+import traceback
+
 from django.shortcuts import redirect, render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.core.cache import cache
 from myapp.models import DroneCommand, DroneStatus
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 ESP32_UDP_PORT = 1234
 
 def dashboard(request):
-    drone_logs = DroneStatus.objects.all()[:50]
+    drone_logs = DroneStatus.objects.all()[:10]
     last_command = DroneCommand.objects.order_by('-timestamp').first()
-    return render(request, 'drone_dashboard.html', {
+    return render(request, 'dashboard.html', {
         'drone_logs': drone_logs,
         'last_command': last_command
     })
 
 @csrf_exempt # allow ESP32 to send data without CSRF token
 def receive_data(request):
-    if request.method == 'POST':
+    if request.method == 'GET':
         try:
-            # ดึง IP ของ ESP32 ที่ส่ง POST เข้ามา และเก็บลง Cache 5 นาที (300 วินาที)
+            latest_status = DroneStatus.objects.first()
+            
+            if latest_status:
+                return JsonResponse({
+                    'status': 'success',
+                    'latitude': float(latest_status.latitude) if latest_status.latitude else None,
+                    'longitude': float(latest_status.longitude) if latest_status.longitude else None,
+                    'flight_mode': latest_status.flight_mode,
+                    'altitude': float(latest_status.altitude)
+                }, status=200)
+            else:
+                return JsonResponse({
+                    'status': 'empty',
+                    'message': 'No drone data available yet.'
+                }, status=200)
+                
+        except Exception as e:
+            return JsonResponse({'status': 'error',
+                                 'message': str(e)},
+                                 status=500)
+
+    elif request.method == 'POST':
+        try:
+            # store ESP32 IP in cache for 5 minutes
             esp_ip = request.META.get('REMOTE_ADDR')
             cache.set('esp32_ip', esp_ip, timeout=300)
             
@@ -53,12 +80,35 @@ def receive_data(request):
                 battery_percentage=battery_percentage
             )
 
+            # send real-time telemetry data to WebSocket group            
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                "drone_f722_control",
+                {
+                    "type": "drone_telemetry_message",
+                    "data": {
+                        "flight_mode": flight_mode,
+                        "latitude": str(latitude) if latitude is not None else None,
+                        "longitude": str(longitude) if longitude is not None else None,
+                        "altitude": str(altitude),
+                        "speed": str(speed),
+                        "roll": str(roll),
+                        "pitch": str(pitch),
+                        "yaw": str(yaw),
+                        "battery_voltage": str(battery_voltage),
+                        "battery_percentage": battery_percentage,
+                        "timestamp": new_data.timestamp.strftime("%d/%m/%Y %H:%M:%S")
+                    }
+                }
+            )
+
             return JsonResponse({
                 'status': 'success', 
                 'message': 'Real-time telemetry data inserted successfully.'
             }, status=201)
         
         except Exception as e:
+            print(traceback.format_exc())
             return JsonResponse({
                 'status': 'error', 
                 'message': str(e)
