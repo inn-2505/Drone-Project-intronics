@@ -4,6 +4,7 @@
 #include <sys/param.h>
 #include <stdlib.h>
 #include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "freertos/task.h"
 #include "esp_http_client.h"
 #include "esp_log.h"
@@ -79,89 +80,28 @@ void send_http_post(const uint8_t *data, int len) {
     esp_http_client_cleanup(client);
 }
 
-
+ 
 
 // Task READ FROM UART AND HTTP POST
 void http_sender_task(void *pvParameters) {
-    // uint8_t *rx_data = (uint8_t *) malloc(BUF_SIZE);
-    // if (rx_data == NULL) {
-    //     ESP_LOGE(TAG, "FULL MEMORY: Failed to allocate memory for UART buffer");
-    //     vTaskDelete(NULL);
-    // }
-    // while (1) {
-    //     // READ FROM UART2 (WAIT FOR 100ms)
-    //     int len = uart_read_bytes(UART_PORT_NUM, rx_data, BUF_SIZE, 100 / portTICK_PERIOD_MS);
-        
-    //     if (len > 0) {
-    //         ESP_LOGI(TAG, "READ FROM UART: %d bytes", len);
-    //         // SEND HTTP POST
-    //         send_http_post(rx_data, len);
-    //     }
-        
-    //     // ข้อควรระวัง: HTTP มี overhead สูง ควรตั้งหน่วงเวลาไม่ให้ถี่เกินไป เพื่อไม่ให้ CPU/Network ทำงานหนักเกิน
-    //     vTaskDelay(500 / portTICK_PERIOD_MS); 
-    // }
+    char json_payload[512];
+    ESP_LOGI(TAG, "HTTP Sender Task is running and waiting for Queue...");
     
-    // free(rx_data);
-    // vTaskDelete(NULL);
-    
-    //dummy variable for testing
-    //char test_msg[64];
-    //int counter = 0;
-
-    
-    static char json_payload[512];
-    char flight_mode[16] = "SLEEP";
-    double lat = 13.7563;
-    double lon = 100.5018;
-    float alt = 100.0;
-    float speed = 10.0;
-    float roll = 0.0;
-    float pitch = 0.0;
-    float yaw = 0.0;
-    float battery_voltage = 16.8;
-    int battery_percentage = 100;
     while (1) {
-        // test dummy 
-        lat += 0.0001;
-        lon += 0.0001;
-        alt += 0.5;
-        if (alt > 150.0) alt = 100.0;
-        speed += 0.1;
-        if (speed > 15.0) speed = 10.0;
-        
-        roll = (float)(rand() % 10 - 5) / 10.0f; // -0.5 ถึง +0.5
-        pitch = (float)(rand() % 10 - 5) / 10.0f; // -0.5 ถึง +0.5
-        yaw = (float)(rand() % 360);
-        
-        battery_voltage -= 0.05f;
-        if (battery_voltage < 14.0f) battery_voltage = 16.8f;
-        battery_percentage = (int)((battery_voltage - 14.0f) / (16.8f - 14.0f) * 100.0f);
-        // ประกอบโครงสร้าง JSON ให้ตรงตาม Key ใน Django Model ของเพื่อน
-        snprintf(json_payload, sizeof(json_payload),
-                 "{"
-                 "\"flight_mode\":\"%s\","  
-                 "\"latitude\":%.6f,"
-                 "\"longitude\":%.6f,"
-                 "\"altitude\":%.1f,"
-                 "\"speed\":%.1f,"
-                 "\"roll\":%.2f,"
-                 "\"pitch\":%.2f,"
-                 "\"yaw\":%.1f,"
-                 "\"battery_voltage\":%.2f,"
-                 "\"battery_percentage\":%d"
-                 "}",
-                 flight_mode, lat, lon, alt, speed, roll, pitch, yaw, battery_voltage, battery_percentage);
+       if (xQueueReceive(http_queue, json_payload, portMAX_DELAY) == pdPASS) {
+            ESP_LOGI(TAG, "Queue item found! Sending HTTP POST: %s", json_payload);
+            
         ESP_LOGI(TAG, "SENDING JSON Telemetry: %s", json_payload);
-
+        // Perform HTTP POST to Django server
         send_http_post((uint8_t *)json_payload, strlen(json_payload));
 
         // ดีเลย์ 5 วินาทีก่อนส่งรอบถัดไป
         vTaskDelay(5000 / portTICK_PERIOD_MS); 
+        }
     }
     vTaskDelete(NULL);
-    
 }
+
 
 void udp_receiver_task(void *pvParameters) 
 {
@@ -169,6 +109,7 @@ void udp_receiver_task(void *pvParameters)
     int addr_family = AF_INET;
     int ip_protocol = IPPROTO_IP;
     struct sockaddr_storage source_addr;
+    drone_command_t cmd_to_send;
 
     while (1) 
     {
@@ -217,35 +158,47 @@ void udp_receiver_task(void *pvParameters)
                     // 2. ดึงค่าแต่ละ Key ออกมา
                     cJSON *latitude_item = cJSON_GetObjectItem(root, "latitude");
                     cJSON *longitude_item = cJSON_GetObjectItem(root, "longitude");
-
-                    // 1. เช็คก่อนว่าดึง Item สำเร็จ (ไม่เป็น NULL)
-                    if (latitude_item != NULL && longitude_item != NULL) {
+                    cJSON *altitude_item = cJSON_GetObjectItem(root, "altitude");
+                    cJSON *arm_item = cJSON_GetObjectItem(root, "arm");
+                    // Verify required fields exist
+                    if (latitude_item != NULL && longitude_item != NULL && altitude_item != NULL) {
                         
-                        // 2. ถ้าเพื่อนส่งมาเป็น Number (ปกติ)
-                        if (cJSON_IsNumber(latitude_item) && cJSON_IsNumber(longitude_item)) {
-                            latitude  = (float)latitude_item->valuedouble;
-                            longitude = (float)longitude_item->valuedouble;
-                        } 
-                        // 3. ถ้าเพื่อนดื้อส่งมาเป็น String (มี "" ครอบ) ให้แปลงข้อความเป็นตัวเลขด้วย atof()
-                        else if (cJSON_IsString(latitude_item) && cJSON_IsString(longitude_item)) {
-                            latitude  = (float)atof(latitude_item->valuestring);
-                            longitude = (float)atof(longitude_item->valuestring);
-                        } 
-                        else {
-                            ESP_LOGE(TAG, "Data type is neither Number nor String!");
-                            // สามารถจัดการ error ตรงนี้เพิ่มได้
+                        // Extract float values (handling both string and number formats)
+                        if (cJSON_IsNumber(latitude_item)) {
+                            cmd_to_send.latitude = (float)latitude_item->valuedouble;
+                        } else {
+                            cmd_to_send.latitude = (float)atof(latitude_item->valuestring);
                         }
-                        
-                        // 🚀 ทำงานต่อเมื่อได้ค่ามาแล้ว
-                        ESP_LOGW(TAG, "🔥 COMMAND APPLIED!");
-                        ESP_LOGW(TAG, "latitude: %.4f | longitude: %.4f ", latitude, longitude);
-
-                    } else {
-                        ESP_LOGE(TAG, "JSON format invalid! Missing 'latitude' or 'longitude' keys.");
+                        if (cJSON_IsNumber(longitude_item)) {
+                            cmd_to_send.longitude = (float)longitude_item->valuedouble;
+                        } else {
+                            cmd_to_send.longitude = (float)atof(longitude_item->valuestring);
+                        }
+                        if (cJSON_IsNumber(altitude_item)) {
+                            cmd_to_send.altitude = (float)altitude_item->valuedouble;
+                        } else {
+                            cmd_to_send.altitude = (float)atof(altitude_item->valuestring);
+                        }
+                        // Extract arm state (optional field, default is 0)
+                        if (arm_item != NULL) {
+                            cmd_to_send.arm_state = (uint8_t)arm_item->valueint;
+                        } else {
+                            cmd_to_send.arm_state = 0;
+                        }
+                        ESP_LOGI(TAG, "Parsed Target: Lat: %.6f, Lon: %.6f, Alt: %.1f", 
+                                 cmd_to_send.latitude, cmd_to_send.longitude, cmd_to_send.altitude);
+                        // Push the command struct into the UART TX Queue
+                        if (xQueueSend(uart_tx_queue, &cmd_to_send, pdMS_TO_TICKS(100)) != pdPASS) {
+                            ESP_LOGW(TAG, "UART TX queue is full, command dropped!");
+                        }
+                    } 
+                    else {
+                        ESP_LOGE(TAG, "JSON format invalid! Missing latitude, longitude, or altitude.");
                     }
                     // อย่าลืมลบ object เพื่อคืน Memory
                     cJSON_Delete(root);
                 } 
+
                 else 
                 {
                     ESP_LOGE(TAG, "JSON parsing error: invalid JSON format");
