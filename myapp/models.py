@@ -9,11 +9,8 @@ class DroneStatus(models.Model):
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     altitude = models.DecimalField(max_digits=6, decimal_places=2, default=0.00) # เมตร
     
-    # orientation and speed
+    # speed
     speed = models.DecimalField(max_digits=5, decimal_places=2, default=0.00) # m/s
-    roll = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
-    pitch = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
-    yaw = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     
     # battery status
     battery_voltage = models.DecimalField(max_digits=4, decimal_places=2, default=0.00) # โวลต์

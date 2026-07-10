@@ -60,9 +60,6 @@ def receive_data(request):
             longitude = data.get('longitude')
             altitude = data.get('altitude') if data.get('altitude') is not None else 0.00
             speed = data.get('speed') if data.get('speed') is not None else 0.00
-            roll = data.get('roll') if data.get('roll') is not None else 0.00
-            pitch = data.get('pitch') if data.get('pitch') is not None else 0.00
-            yaw = data.get('yaw') if data.get('yaw') is not None else 0.00
             battery_voltage = data.get('battery_voltage') if data.get('battery_voltage') is not None else 0.00
             battery_percentage = data.get('battery_percentage') if data.get('battery_percentage') is not None else 100
 
@@ -73,9 +70,6 @@ def receive_data(request):
                 longitude=longitude,
                 altitude=altitude,
                 speed=speed,
-                roll=roll,
-                pitch=pitch,
-                yaw=yaw,
                 battery_voltage=battery_voltage,
                 battery_percentage=battery_percentage
             )
@@ -92,9 +86,6 @@ def receive_data(request):
                         "longitude": str(longitude) if longitude is not None else None,
                         "altitude": str(altitude),
                         "speed": str(speed),
-                        "roll": str(roll),
-                        "pitch": str(pitch),
-                        "yaw": str(yaw),
                         "battery_voltage": str(battery_voltage),
                         "battery_percentage": battery_percentage,
                         "timestamp": new_data.timestamp.strftime("%d/%m/%Y %H:%M:%S")
