@@ -1,0 +1,48 @@
+
+body { font-family: sans-serif; background: #1a1a2e; color: #fff; padding: 20px; }
+.container { max-width: 1000px; margin: 0 auto; }
+h1 { color: #00f2fe; text-align: center; }
+h2 { color: #00f2fe; margin-top: 0; font-size: 1.2rem; text-transform: uppercase; }
+
+/* Control Panel Styles */
+.control-panel { background: #162447; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #1f4068; }
+.btn-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
+.btn { padding: 10px 20px; color: white; border: none; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+.btn-blue { background: #0275d8; } .btn-blue:hover { background: #025aa5; }
+.btn-orange { background: #f0ad4e; } .btn-orange:hover { background: #ec971f; }
+.btn-green { background: #4e9f3d; } .btn-green:hover { background: #3e8030; }
+.btn-red { background: #d9534f; } .btn-red:hover { background: #c9302c; }
+
+.btn-recenter {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1000; 
+    background: #ffffff;
+    color: #1a1a2e;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.35);
+    transition: background 0.2s, box-shadow 0.2s;
+}
+.btn-recenter:hover {
+    background: #f0f0f0;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.45);
+}
+
+/* Table Styles */
+table { width: 100%; border-collapse: collapse; background: #162447; margin-top: 20px; }
+th, td { padding: 12px; border: 1px solid #1f4068; text-align: left; }
+th { background: #1f4068; color: #00f2fe; }
+
+/* Status Badges */
+.badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; }
+.STABILIZE { background: #0275d8; }
+.ALT_HOLD { background: #f0ad4e; }
+.LOITER { background: #4e9f3d; }
+.RTL { background: #6f42c1; }
+.ARM { background: #28a745; }
+.DISARM { background: #dc3545; }
