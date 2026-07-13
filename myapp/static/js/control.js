@@ -1,13 +1,6 @@
 // ตัวแปรจำสถานะของแต่ละแกน (เริ่มต้นเป็น 0 คือปล่อยมือนิ่งทั้งหมด)
 let isManualModeActive = false;
 
-let droneState = {
-    throttle: 0,
-    yaw: 0,
-    pitch: 0,
-    roll: 0
-};
-
 const keyBtnMap = {
     'w': 'btn-th-up',
     's': 'btn-th-down',
@@ -19,28 +12,86 @@ const keyBtnMap = {
     'arrowright': 'btn-roll-rgt'
 };
 
-function sendActionCommand(commandType) {
-    let altValue = null;
-    let speedValue = null;
+let isArmed = false;
 
-    // 🌟 เช็กเงื่อนไข: ถ้าเป็นคำสั่ง TAKEOFF (หรือคำสั่งที่ต้องการระบุค่า) ค่อยไปดึงค่าจากสไลเดอร์
-    if (commandType === 'TAKEOFF' || commandType === 'SET_PARAM') {
-        const altSlider = document.querySelector('input[type="range"][max="120"]');
-        const speedSlider = document.querySelector('input[type="range"][max="15"]');
-        
-        altValue = altSlider ? parseFloat(altSlider.value) : 30; // ถ้าหาบาร์ไม่เจอ ให้ Default ที่ 30 เมตร
-        speedValue = speedSlider ? parseFloat(speedSlider.value) : 5;  // ถ้าหาบาร์ไม่เจอ ให้ Default ที่ 5 m/s
+let throttle = 0;
+let yaw = 0;
+let pitch = 0;
+let roll = 0;
+
+let currentDroneCommand = 'DISARM';
+//ฟังก์ชันสร้างชุดข้อมูลตามฟอร์แมตมาตรฐาน
+function getDroneDataFormat(customCommand = null, joystickData = null) {
+    // ใช้คำสั่งที่ส่งเข้ามา หรือถ้าไม่มีให้ใช้สถานะคำสั่งล่าสุดบนหน้าเว็บ
+    const activeCommand = customCommand || currentDroneCommand;
+
+    // กำหนดค่าเริ่มต้นของจอยสติ๊ก (ถ้าไม่มีการส่งมา ให้เป็น 0)
+    const lat1 = 0.0;
+    const lon1 = 0.0;
+    const lat2 = 0.0;
+    const lon2 = 0.0;
+
+   // 1.3 ค้นหา Slider ความสูงและความเร็วตามสเปกของหน้าเว็บ
+    const altSlider = document.querySelector('input[type="range"][max="120"]');
+    const speedSlider = document.querySelector('input[type="range"][max="15"]');
+
+    // ดึงค่าเริ่มต้นจากสไลเดอร์
+    let alt = altSlider ? parseFloat(altSlider.value) : 30;
+    let spd = speedSlider ? parseFloat(speedSlider.value) : 5;
+
+    // 🔥 บังคับใช้ Logic ค่า Default/ค่าสไลเดอร์ เมื่อเป็น ARM หรือ SET_PARAM
+    if (activeCommand === 'ARM' || activeCommand === 'SET_PARAM') {
+        alt = altSlider ? parseFloat(altSlider.value) : 30;
+        spd = speedSlider ? parseFloat(speedSlider.value) : 5;
     }
-    // 🌟 ถ้าเป็นคำสั่ง LAND, RTH, EMERGENCY ค่า altValue กับ speedValue จะถูกปล่อยให้เป็น null โดยอัตโนมัติ ป้องกันโดรนเอ๋อ
+    
+    // 1.4 ดึงค่าปุ่มควบคุมทิศทาง (ถ้าไม่มีการขยับให้เป็น 0)
+    const outThrottle = joystickData ? joystickData.throttle : throttle;
+    const outYaw = joystickData ? joystickData.yaw : yaw;
+    const outPitch = joystickData ? joystickData.pitch : pitch;
+    const outRoll = joystickData ? joystickData.roll : roll;
 
-    // แพ็กข้อมูลส่งใน Format มาตรฐาน
-    const payload = {
-        'command': commandType,
-        'latitude': null,
-        'longitude': null,
-        'altitude': altValue,
-        'speed': speedValue
+    // ส่งกลับออกไปตามฟอร์แมตที่คุณต้องการเป๊ะ ๆ
+    return {
+        command: activeCommand,
+        lat1: lat1,
+        lon1: lon1,
+        lat2: lat2,
+        lon2: lon2,
+        alt: alt,
+        spd: spd,
+        throttle: outThrottle,
+        yaw: outYaw,
+        pitch: outPitch,
+        roll: outRoll
     };
+}
+
+function toggleArmDisarm() {
+    const btn = document.getElementById('btn-arm-toggle');
+    const icon = document.getElementById('icon-arm-toggle');
+    const text = document.getElementById('text-arm-toggle');
+
+    if (!isArmed) {
+        // ---- จังหวะที่ 1: กดเพื่อ ARM ----
+        currentDroneCommand = 'ARM';
+        sendActionCommand(currentDroneCommand);
+        isArmed = true;
+        text.innerText = 'Disarm Drone'; // สลับตัวอักษร
+        btn.style.background = '#ef3c1d'; // (แถม) เปลี่ยนสีปุ่มเป็นสีแดงให้ดูเตือนภัยขึ้น
+        
+    } else {
+        // ---- จังหวะที่ 2: กดเพื่อ DISARM ----
+        currentDroneCommand = 'DISARM';
+        sendActionCommand(currentDroneCommand); // ส่งคำสั่งไปที่ Django backend
+        
+        isArmed = false;
+        text.innerText = 'Arm Drone'; // สลับตัวอักษรกลับ
+        btn.style.background = '#00fe048e'; // สลับสีปุ่มกลับเป็นสีฟ้า/เขียวเดิม
+    }
+}
+function sendActionCommand(commandType) {
+    const payload = getDroneDataFormat(commandType, null);
 
     // ยิง Fetch API ไปหา Django ตามปกติ
     fetch('/api/command/', {
@@ -51,8 +102,8 @@ function sendActionCommand(commandType) {
     .then(response => response.json())
     .then(data => {
         // บันทึก Log ลงหน้าจอตามประเภทคำสั่ง
-        if (altValue !== null) {
-            addLogToHUD(`✅ Sent: ${commandType} (Target Alt: ${altValue}m, Spd: ${speedValue}m/s)`);
+        if (payload.alt!== null) {
+            addLogToHUD(`✅ Sent: ${commandType} (Target Alt: ${payload.alt}m, Spd: ${payload.spd}m/s)`);
         } else {
             addLogToHUD(`✅ Sent: ${commandType} (Direct Action)`);
         }
@@ -77,28 +128,31 @@ function sendDirectionCommand(cmd) {
         alert("⚠️ Manual control is disabled. Please switch to MANUAL mode first.");
         return;
     }
+
     console.log("📍 On-screen command:", cmd);
     sendDroneStateToDjango();
 }
 
 // ฟังก์ชันสำหรับยิงข้อมูล 4 แกนไปหา Django
 function sendDroneStateToDjango() {
+    const payload = getDroneDataFormat(null, {
+        throttle: throttle,
+        yaw: yaw,
+        pitch: pitch,
+        roll: roll
+    });
     // อัปเดตตัวหนังสือสถานะบนหน้าจอให้เราเห็น
     const logContainer = document.getElementById('actionLog');
-    if (!isManualModeActive) {
-        alert("⚠️ Manual control is disabled. Please switch to MANUAL mode first.");
-        return;
-    }
     if (logContainer) {
-        logContainer.innerText = `T:${droneState.throttle} | Y:${droneState.yaw} | P:${droneState.pitch} | R:${droneState.roll}`;
+        logContainer.innerText = `T:${payload.throttle} | Y:${payload.yaw} | P:${payload.pitch} | R:${payload.roll}`;
     }
-
+    
     fetch('/api/manual-control/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify(droneState) // 🚀 ส่งวัตถุ 4 แกนไปเลย!
+        body: JSON.stringify(payload) // 🚀 ส่งวัตถุ 4 แกนไปเลย!
     })
     .catch(error => console.error("Error sending state:", error));
 }
@@ -107,17 +161,18 @@ document.addEventListener('keydown', function(event) {
     let changed = false;
     const keyLower = event.key.toLowerCase();
     if (!isManualModeActive) {
+        alert("⚠️ Manual control is disabled. Please switch to MANUAL mode first.");
         return;
     }
     switch(keyLower) {
-        case 'w': droneState.throttle = 1; changed = true; break;
-        case 's': droneState.throttle = -1; changed = true; break;
-        case 'a': droneState.yaw = -1; changed = true; break;
-        case 'd': droneState.yaw = 1; changed = true; break;
-        case 'arrowup': droneState.pitch = 1; changed = true; event.preventDefault(); break;
-        case 'arrowdown': droneState.pitch = -1; changed = true; event.preventDefault(); break;
-        case 'arrowleft': droneState.roll = -1; changed = true; event.preventDefault(); break;
-        case 'arrowright': droneState.roll = 1; changed = true; event.preventDefault(); break;
+        case 'w': throttle = 1; changed = true; break;
+        case 's': throttle = -1; changed = true; break;
+        case 'a': yaw = -1; changed = true; break;
+        case 'd': yaw = 1; changed = true; break;
+        case 'arrowup': pitch = 1; changed = true; event.preventDefault(); break;
+        case 'arrowdown': pitch = -1; changed = true; event.preventDefault(); break;
+        case 'arrowleft': roll = -1; changed = true; event.preventDefault(); break;
+        case 'arrowright': roll = 1; changed = true; event.preventDefault(); break;
     }
     const btnId = keyBtnMap[keyLower];
     if (btnId) {
@@ -138,10 +193,10 @@ document.addEventListener('keyup', function(event) {
     const keyLower = event.key.toLowerCase();
     switch(keyLower) {
         // พอปล่อยปุ่มไหน แกะนั้นจะกลับมาเป็น 0 (นิ่ง) ทันที
-        case 'w': case 's': droneState.throttle = 0; changed = true; break;
-        case 'a': case 'd': droneState.yaw = 0; changed = true; break;
-        case 'arrowup': case 'arrowdown': droneState.pitch = 0; changed = true; break;
-        case 'arrowleft': case 'arrowright': droneState.roll = 0; changed = true; break;
+        case 'w': case 's': throttle = 0; changed = true; break;
+        case 'a': case 'd': yaw = 0; changed = true; break;
+        case 'arrowup': case 'arrowdown': pitch = 0; changed = true; break;
+        case 'arrowleft': case 'arrowright': roll = 0; changed = true; break;
     }
 
     const btnId = keyBtnMap[keyLower];
@@ -156,6 +211,7 @@ document.addEventListener('keyup', function(event) {
 
     if (changed) sendDroneStateToDjango();
 });
+
 
 function addLogToHUD(message, isError = false) {
     const logContainer = document.getElementById('control-logs-container');

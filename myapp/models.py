@@ -28,24 +28,30 @@ class DroneStatus(models.Model):
 
 class DroneCommand(models.Model):
     command = models.CharField(max_length=50, default="NONE")
-    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    lat1 = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    lon1 = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    lat2 = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    lon2 = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     altitude = models.DecimalField(max_digits=6, decimal_places=2, default=0.00) # เมตร
     speed = models.DecimalField(max_digits=5, decimal_places=2, default=0.00) # m/s
+    throttle = models.IntegerField(default=0)
+    yaw = models.IntegerField(default=0)
+    pitch = models.IntegerField(default=0)
+    roll = models.IntegerField(default=0)
     timestamp = models.DateTimeField(auto_now=True)
     
     class Meta:
         db_table = 'drone_f722_command'    
 
-class ManualControlLog(models.Model):
+# class ManualControlLog(models.Model):
     
-    throttle = models.IntegerField(default=0)
-    yaw = models.IntegerField(default=0)
-    pitch = models.IntegerField(default=0)
-    roll = models.IntegerField(default=0)
-    altitude = models.DecimalField(max_digits=6, decimal_places=1, default=0.00)
-    speed = models.IntegerField(default=0)
-    timestamp = models.DateTimeField(auto_now_add=True)
+#     throttle = models.IntegerField(default=0)
+#     yaw = models.IntegerField(default=0)
+#     pitch = models.IntegerField(default=0)
+#     roll = models.IntegerField(default=0)
+#     altitude = models.DecimalField(max_digits=6, decimal_places=1, default=0.00)
+#     speed = models.IntegerField(default=0)
+#     timestamp = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"T:{self.throttle} Y:{self.yaw} P:{self.pitch} R:{self.roll} at {self.timestamp}"
+#     def __str__(self):
+#         return f"T:{self.throttle} Y:{self.yaw} P:{self.pitch} R:{self.roll} at {self.timestamp}"

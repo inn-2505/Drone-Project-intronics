@@ -120,23 +120,33 @@ def send_udp_command(request):
             body = json.loads(request.body)
             command_text = body.get('command')
             
-            latitude = body.get('latitude')
-            longitude = body.get('longitude')
-            alt = body.get('altitude')
-            spd = body.get('speed')
+            lat1 = body.get('lat1')
+            lon1 = body.get('lon1')
+            lat2 = body.get('lat2')
+            lon2 = body.get('lon2')
+            alt = body.get('alt')
+            spd = body.get('spd')
+            throttle = body.get('throttle')
+            yaw = body.get('yaw')
+            pitch = body.get('pitch')
+            roll = body.get('roll')
 
             if not command_text:
                 return JsonResponse({'status': 'error', 'message': 'Missing command'}, status=400)
 
             # 🌟 ป้องกันบั๊ก: เช็กก่อนแปลงเป็น float เพราะถ้าส่งมาจากหน้า Control ค่าจะเป็น None
-            db_lat = float(latitude) if latitude is not None else None
-            db_lon = float(longitude) if longitude is not None else None
+            db_lat1 = float(lat1) if lat1 is not None else None
+            db_lon1 = float(lon1) if lon1 is not None else None
+            db_lat2 = float(lat2) if lat2 is not None else None
+            db_lon2 = float(lon2) if lon2 is not None else None
             
             # save command to PostgreSQL for logging (ใช้ค่าที่ปลอดภัยจากบั๊กแล้ว)
             DroneCommand.objects.create(
                 command=command_text,
-                latitude=db_lat,
-                longitude=db_lon,
+                lat1=db_lat1,
+                lon1=db_lon1,
+                lat2=db_lat2,
+                lon2=db_lon2,
             )
             
             # pull ESP32 IP from cache
@@ -152,10 +162,16 @@ def send_udp_command(request):
             # 🌟 เติมสิ่งที่ขาดหาย: แนบ "command" เข้าไปใน Payload UDP เพื่อให้ ESP32 เอาไปใช้สั่งงานมอเตอร์ได้
             payload = json.dumps({
                 "command": command_text,
-                "latitude": db_lat,
-                "longitude": db_lon,
-                "altitude": float(alt) if alt is not None else None,
-                "speed": float(spd) if spd is not None else None
+                "lat1": db_lat1,
+                "lon1": db_lon1,
+                "lat2": db_lat2,
+                "lon2": db_lon2,
+                "alt": float(alt) if alt is not None else None,
+                "spd": float(spd) if spd is not None else None,
+                "throttle": float(throttle) if throttle is not None else None,
+                "yaw": float(yaw) if yaw is not None else None,
+                "pitch": float(pitch) if pitch is not None else None,
+                "roll": float(roll) if roll is not None else None
             })
             
             sock.sendto(payload.encode('utf-8'), (esp_ip, ESP32_UDP_PORT))
@@ -238,12 +254,19 @@ def manual_control_view(request):
                     'message': 'Manual control is disabled because the drone is not in MANUAL mode. Please switch to MANUAL mode first.'
                 }, status=403)
                 
-            body = json.loads(request.body)
-            throttle = body.get('throttle', 0)
-            yaw = body.get('yaw', 0)
-            pitch = body.get('pitch', 0)
-            roll = body.get('roll', 0)
-            #print(f"🎮 Manual RC Input -> T: {throttle}, Y: {yaw}, P: {pitch}, R: {roll}")
+            data = json.loads(request.body)
+            command = data.get('command', 'DISARM')
+            lat1 = data.get('lat1', 0.0)
+            lon1 = data.get('lon1', 0.0)
+            lat2 = data.get('lat2', 0.0)
+            lon2 = data.get('lon2', 0.0)
+            alt = data.get('alt', 0.0)
+            spd = data.get('spd', 0.0)
+            throttle = data.get('throttle', 0)
+            yaw = data.get('yaw', 0)
+            pitch = data.get('pitch', 0)
+            roll = data.get('roll', 0)
+            print(f"[{command}] Lat1:{lat1} Lon1:{lon1} Lat2:{lat2} Lon2:{lon2} Alt:{alt} Spd:{spd} | Joy -> Throttle:{throttle} Yaw:{yaw}")
             # (โค้ดบันทึก PostgreSQL และส่ง UDP ของคุณตามปกติ...)
             
             esp_ip = cache.get('esp32_ip')

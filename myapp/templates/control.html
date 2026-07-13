@@ -90,9 +90,10 @@
         <div>
             <div class="hud-card">
                 <h3 style="color: #00f2fe; margin-top: 0;"><i class="fa-solid fa-plane-departure"></i> Commands</h3>
-                <button class="btn-action btn-takeoff" onclick="sendActionCommand('TAKEOFF')"><i class="fa-solid fa-arrow-up"></i> Auto Takeoff</button>
-                <button class="btn-action btn-land" onclick="sendActionCommand('LAND')"><i class="fa-solid fa-arrow-down"></i> Auto Land</button>
-                <button class="btn-action btn-land" onclick="sendActionCommand('RTH')"style="background: #3b82f6;" onclick="sendActionCommand('RTL')"><i class="fa-solid fa-house"></i> Return To Home</button>
+                <button id="btn-arm-toggle" class="btn-action btn-takeoff" onclick="toggleArmDisarm()">
+                    <i id="icon-arm-toggle" class="fa-solid fa-shield-halved"></i> 
+                    <span id="text-arm-toggle">Arm Drone</span>
+                </button>
             </div>
             
             <div class="hud-card" style="border-color: #ef4444;">

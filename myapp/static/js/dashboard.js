@@ -23,12 +23,23 @@ const droneIcon = L.icon({
     popupAnchor: [0, -20]    
 });
 
-const targetIcon = L.icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/128/14025/14025508.png', // ไอคอนหมุดเป้าหมายสีแดง
-    iconSize: [36, 36],
-    iconAnchor: [18, 36],
-    popupAnchor: [0, -30]
-});
+function createPinIcon(color, size = 36) {
+    const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24">
+            <path fill="${color}" stroke="#7a0000" stroke-width="0.6"
+                d="M12 0C7.6 0 4 3.6 4 8c0 5.4 7 15.6 7.3 16a1 1 0 0 0 1.4 0C13 23.6 20 13.4 20 8c0-4.4-3.6-8-8-8z"/>
+            <circle cx="12" cy="8" r="3.2" fill="#ffffff"/>
+        </svg>`;
+    return L.divIcon({
+        html: svg,
+        className: '', // กันไม่ให้ Leaflet ใส่ background/border ของ divIcon ปกติมาทับ
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size],
+        popupAnchor: [0, -size]
+    });
+}
+const targetIcon = createPinIcon('#e48787');  
+const targetConfirmedIcon = createPinIcon('#c60000');   
 // ============================================
 // Initialize Leaflet Map (ทำงานเมื่อ HTML พร้อมโหลด)
 // ============================================
@@ -45,6 +56,18 @@ document.addEventListener("DOMContentLoaded", function() {
     //     .bindPopup('🛸 Drone F722')
     //     .openPopup();
     droneMarker = L.marker(currentDroneLatLng, { icon: droneIcon }).addTo(map);
+    // 🛠️ พอลากปล่อยมือ ให้อัปเดตตำแหน่งโดรนปัจจุบัน (currentDroneLatLng) ตามจุดใหม่ที่ลากไป
+    // เพื่อให้คำสั่ง ARM/GOTO ครั้งต่อไปอ้างอิงตำแหน่งที่ลากไว้ ไม่ใช่ตำแหน่งเดิม
+    droneMarker.on('dragend', function(event) {
+        const position = event.target.getLatLng();
+        currentDroneLatLng = [position.lat, position.lng];
+
+        // อัปเดตเส้นประให้ลากตามตำแหน่งโดรนใหม่ ถ้ามีเป้าหมายตั้งไว้อยู่
+        if (activeTargetLatLng) {
+            updateDisplacementLine(activeTargetLatLng);
+        }
+    });
+    
     // 3. ปักหมุดสถานที่ท่องเที่ยวต่างๆ พร้อมปุ่มกดส่งค่าพิกัด
     // locations.forEach(loc => {
     //     const marker = L.marker([loc.lat, loc.lon]).addTo(map);
@@ -107,7 +130,7 @@ function moveOrActionTargetMarker(lat, lon) {
     popupDiv.style.textAlign = 'center';
     popupDiv.innerHTML = `
         <b style="color: #ff4a4a;">🎯 Target Position</b><br>
-        <span style="font-size: 0.75rem; color:#666;">Lat: ${lat.toFixed(5)}<br>Lng: ${lon.toFixed(5)}</span><br>
+        <span style="font-size: 0.75rem; color:#666;">Lat: ${lat.toFixed(6)}<br>Lng: ${lon.toFixed(6)}</span><br>
         <button class="btn btn-red confirm-fly-btn" 
                 style="padding: 6px 10px; margin-top: 6px; font-size: 0.8rem; background-color: #ff4a4a; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
             Confirm Target
@@ -119,7 +142,6 @@ function moveOrActionTargetMarker(lat, lon) {
     });
 
     if (!targetMarker) {
-        // ถ้ายังไม่มีหมุดเป้าหมายแดง ให้สร้างขึ้นมาเปิดโหมด { draggable: true }
         targetMarker = L.marker(activeTargetLatLng, { icon: targetIcon, draggable: true }).addTo(map);
 
         // ดักฟังตอน "เริ่มลาก" ให้ปิดป๊อปอัปก่อน
@@ -132,17 +154,21 @@ function moveOrActionTargetMarker(lat, lon) {
             const marker = event.target;
             const position = marker.getLatLng();
             
+            // 🛠️ ลากไปตำแหน่งใหม่ = ยังไม่ confirm ส่ง จึงรีเซ็ต icon กลับเป็นสีแดงปกติ (ยังไม่ยืนยัน)
+            marker.setIcon(targetIcon);
+            
             // เรียกฟังก์ชันตัวเองวนกลับมาลูปซ้ำเพื่ออัปเดตเส้นและผูกปุ่มป๊อปอัปพิกัดใหม่
             moveOrActionTargetMarker(position.lat, position.lng);
         });
-    } else {
-        // ถ้ามีหมุดอยู่แล้วบนแผนที่ ให้ย้ายพิกัดมันไปจุดล่าสุด
-        targetMarker.setLatLng(activeTargetLatLng);
+        } else {
+            // ถ้ามีหมุดอยู่แล้วบนแผนที่ ให้ย้ายพิกัดมันไปจุดล่าสุด
+            targetMarker.setLatLng(activeTargetLatLng);
+            // 🛠️ เป้าหมายใหม่ = ยังไม่ confirm ส่ง จึงรีเซ็ต icon กลับเป็นสีแดงปกติ
+            targetMarker.setIcon(targetIcon);
+            // ผูกป๊อปอัปใหม่เข้าไปแล้วสั่งเปิดค้างไว้ นักบินจะได้กดสั่งบินได้สะดวก
+        }
+        targetMarker.bindPopup(popupDiv).openPopup();
     }
-
-    // ผูกป๊อปอัปใหม่เข้าไปแล้วสั่งเปิดค้างไว้ นักบินจะได้กดสั่งบินได้สะดวก
-    targetMarker.bindPopup(popupDiv).openPopup();
-}
 // ฟังก์ชันดึงหน้าจอกลับมาโฟกัสที่โดรน
 function recenterMap() {
     if (!map) return; 
@@ -165,33 +191,39 @@ function updateDisplacementLine(targetLatLng) {
 }
 
 // ฟังก์ชันเมื่อกดปุ่มส่งพิกัดบนแผนที่
+const DEFAULT_SAFE_ALT = 30; // เมตร
+const DEFAULT_SAFE_SPD = 5;  // m/s
+
 function triggerTargetCommand(droneLat, droneLon, targetLat, targetLon) {
-    sendUdpCommand('GOTO', droneLat, droneLon, targetLat, targetLon);
-    if (targetMarker) targetMarker.closePopup();
+    sendUdpCommand('ARM', droneLat, droneLon, targetLat, targetLon);
+    if (targetMarker) {
+        targetMarker.setIcon(targetConfirmedIcon);
+        targetMarker.closePopup();
+    }
 }
 
 // ฟังก์ชันยิง HTTP POST คำสั่งไปยัง Django Backend
 function sendUdpCommand(cmd, lat1 = null, lon1 = null, lat2 = null, lon2 = null) {
-    const payload = { 'command': cmd };
-    if (lat1 !== null && lon1 !== null && lat2 !== null && lon2 !== null) {
-        payload['lat_1'] = lat1;
-        payload['lon_1'] = lon1;
-        payload['lat_2'] = lat2;
-        payload['lon_2'] = lon2;
-    }
+    const payload = {
+        command: cmd,
+        lat1: lat1,
+        lon1: lon1,
+        lat2: lat2,
+        lon2: lon2,
+        alt: DEFAULT_SAFE_ALT,
+        spd: DEFAULT_SAFE_SPD,
+        throttle: 0,
+        yaw: 0,
+        pitch: 0,
+        roll: 0
+    };
 
     fetch('/api/command/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',                
         },
-        body: JSON.stringify({
-            'command': cmd,
-            'lat_1': lat1,
-            'lon_1': lon1,
-            'lat_2': lat2,
-            'lon_2': lon2
-        })
+        body: JSON.stringify(payload)
     })
     .then(response => {
         if (!response.ok) {
