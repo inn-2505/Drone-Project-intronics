@@ -4,69 +4,23 @@
 #include "esp_log.h"
 #include "driver/uart.h"
 #include "soc/uart_struct.h"
-#include "string.h"
+#include <string.h>
 #include <stdio.h>
 #include "esp_event.h"
 #include "driver/gpio.h"
 #include "esp_rom_gpio.h"
 #include "config.h"
+#include <stdint.h>
+#include "cJSON.h"
+#include "drone_protocol.h"
 
 static const char *TAG = "UART_CONNECTING";
 
-static drone_telemetry_t drone_data = {0};
-void parse_msp_packet(uint8_t cmd, uint8_t *payload, uint8_t size) {
-    if (cmd == MSP_RAW_GPS) {
-        // MSP_RAW_GPS payload structure:
-        // Byte 0: Fix status (1 byte)
-        // Byte 1: Num Satellites (1 byte)
-        // Byte 2-5: Latitude (4 bytes int32, scaled by 10,000,000)
-        // Byte 6-9: Longitude (4 bytes int32, scaled by 10,000,000)
-        // Byte 10-11: Altitude (2 bytes uint16, meters)
-        // Byte 12-13: Speed (2 bytes uint16, cm/s)
-        
-        if (size >= 14) {
-            int32_t raw_lat = (int32_t)(payload[2] | (payload[3] << 8) | (payload[4] << 16) | (payload[5] << 24));
-            int32_t raw_lon = (int32_t)(payload[6] | (payload[7] << 8) | (payload[8] << 16) | (payload[9] << 24));
-            uint16_t raw_alt = (uint16_t)(payload[10] | (payload[11] << 8));
-            uint16_t raw_speed = (uint16_t)(payload[12] | (payload[13] << 8));
-            
-            drone_data.latitude = raw_lat / 10000000.0;
-            drone_data.longitude = raw_lon / 10000000.0;
-            drone_data.altitude = (float)raw_alt; // Altitude in meters
-            drone_data.speed = raw_speed / 100.0f; // Convert cm/s to m/s
-        }
-    } 
-    
-}
-
-
-
-// Helper function to send MSP command to Flight Controller
-void send_msp_command(uint8_t cmd, uint8_t *payload, uint8_t size) {
-    uint8_t header[5];
-    uint8_t checksum = 0;
-    
-    // MSP V1 Header format: '$', 'M', '<' (indicating command sent to FC)
-    header[0] = '$';
-    header[1] = 'M';
-    header[2] = '<';
-    header[3] = size;
-    header[4] = cmd;
-    
-    // Calculate XOR checksum starting with size and command ID
-    checksum = size ^ cmd;
-    
-    // XOR payload data bytes into checksum
-    for (int i = 0; i < size; i++) {
-        checksum ^= payload[i];
-    }
-    
-    // Write header, payload, and checksum to UART TX
-    uart_write_bytes(UART_PORT_NUM, (const char *)header, 5);
-    if (size > 0 && payload != NULL) {
-        uart_write_bytes(UART_PORT_NUM, (const char *)payload, size);
-    }
-    uart_write_bytes(UART_PORT_NUM, (const char *)&checksum, 1);
+uint8_t calc_checksum(uint8_t len, const uint8_t *data)
+{
+    uint8_t chk = len;
+    for (int i = 0; i < len; i++) chk ^= data[i];
+    return chk;
 }
 
 void init_uart(void) {
@@ -85,142 +39,165 @@ void init_uart(void) {
     ESP_LOGI(TAG, "CONFIGURATION UART ALREADY (Baud rate: %d)", UART_BAUD_RATE);
 }
 
+void uart_send(const uint8_t *data, size_t length)
+{
+    //  Header (1 Byte) + Data (19 Byte) = 20 Byte
+    size_t packet_len = 1 + length;
+    uint8_t packet[packet_len];
+
+    packet[0] = HEADER;
+    memcpy(&packet[1], data, length);
+    uint8_t checksum = calc_checksum(packet_len, packet);
+
+    uart_write_bytes(UART_PORT_NUM, (const char *)packet, packet_len); // ยิง Header + Data
+    uart_write_bytes(UART_PORT_NUM, (const char *)&checksum, 1);       // ยิง Checksum ปิดท้าย
+}
 // Send a UART message
+
 void tx_task(void *pvParameters)
 {   
-    drone_command_t received_cmd;
-    uint8_t msp_payload[13]; // Size: 3 floats (4*3 = 12 bytes) + 1 byte arm state = 13 bytes
-    ESP_LOGI(TAG, "UART Transmitter Task is waiting for command queue...");
-    while (1)
-    {
-        // Blocks and waits for commands in the queue
-        if (xQueueReceive(uart_tx_queue, &received_cmd, portMAX_DELAY) == pdPASS) {
-            ESP_LOGI(TAG, "Received command from queue! Forwarding to Drone...");
-            // Serialize target coordinates and arm state into binary payload (Little-Endian)
-            // Latitude (Bytes 0-3)
-            memcpy(&msp_payload[0], &received_cmd.latitude, 4);
-            // Longitude (Bytes 4-7)
-            memcpy(&msp_payload[4], &received_cmd.longitude, 4);
-            // Altitude (Bytes 8-11)
-            memcpy(&msp_payload[8], &received_cmd.altitude, 4);
-            // Arm State (Byte 12)
-            msp_payload[12] = received_cmd.arm_state;
+    uint8_t payload[DATA_LEN];
+    ESP_LOGI(TAG, "uart_tx_queue Task is running and waiting for Queue...");
+    
+    while (1) {
+        // รอรับข้อความในคิว
+        if (xQueueReceive(uart_tx_queue, payload, portMAX_DELAY) == pdPASS) {
+            int32_t lat1, lon1, lat2, lon2;
+            uint16_t alt;
+            uint8_t speed;
 
-            // Transmit the command via MSP packet over UART
-            send_msp_command(MSP_SET_DESTINATION, msp_payload, 13);
-            ESP_LOGI(TAG, "MSP Command Sent (ID: %d, Payload Size: 13 bytes)", MSP_SET_DESTINATION);
-        }     
+            memcpy(&lat1,  &payload[0],  4);
+            memcpy(&lon1,  &payload[4],  4);
+            memcpy(&lat2,  &payload[8],  4);
+            memcpy(&lon2,  &payload[12], 4);
+            memcpy(&alt,   &payload[16], 2);
+            speed = payload[18]; 
+
+            // หาร 1,000,000.0 เพื่อให้กลับเป็นทศนิยม
+            ESP_LOGI("UART_TX", "Sending Data -> P1: (%.6f, %.6f) | P2: (%.6f, %.6f) | Alt: %d m | Spd: %d km/h",
+                     lat1 / 1000000.0, lon1 / 1000000.0, 
+                     lat2 / 1000000.0, lon2 / 1000000.0, 
+                     alt, speed);
+
+            
+            uart_send(payload, DATA_LEN);       
+        }
+    }
+    
+    vTaskDelete(NULL);
+}
+
+void convert2json(const uint8_t *data, char *json_buffer, size_t buffer_size)
+{
+    // แปลง byte array ดิบ ให้เป็น struct
+    monitor_packet_t parsed;
+    memcpy(&parsed, data, sizeof(monitor_packet_t));
+
+    // ประกอบเป็น JSON string
+    snprintf(json_buffer, buffer_size,
+             "{"
+             "\"flight_mode\":%s,"
+             "\"latitude\":%ld,"
+             "\"longitude\":%ld,"
+             "\"altitude\":%d,"
+             "\"speed\":%u,"
+             "\"battery_voltage\":%.2f,"
+             "\"battery_percentage\":%u"
+             "}",
+             get_flight_mode_str(parsed.flight_mode),
+             parsed.latitude,
+             parsed.longitude,
+             parsed.altitude,
+             parsed.speed,
+             parsed.batt_voltage,
+             parsed.batt_percentage);
+ 
+}
+ 
+
+/* เรียกเมื่อ parse packet สำเร็จ (checksum ตรง) */
+void on_packet(const uint8_t *data,size_t length)
+{
+    ESP_LOGI(TAG, "Got packet:");
+    for (int i = 0 ; i < length; i++) { 
+        printf("%02X ", data[i]);  
+    }
+    printf("\n");
+    char json_payload[256];
+    convert2json(data, json_payload, sizeof(json_payload));
+
+        //  ส่งเข้า queue เดิม ให้ http_sender_task ไปยิง HTTP POST ต่อ
+    if (xQueueSend(http_queue, json_payload, pdMS_TO_TICKS(10)) != pdPASS) {
+        ESP_LOGW(TAG, "http_queue full, telemetry dropped!");
     }
 }
 
-void rx_task(void* pvParameters)
+
+void rx_task(void *pvParameters)
 {
-    esp_log_level_set(TAG ,ESP_LOG_INFO);
+    state_t state = WAIT_HEADER;
+    
+    size_t length = sizeof(monitor_packet_t) + 4; // 22 bytes (data) + 2 byte (header) + 1 byte (payload_len) + 1 byte (checksum)
+    static uint8_t buf[256];
+    uint8_t idx = 0;
     uint8_t byte_in;
 
-    // Local state variables for parsing MSP packets
-    msp_parser_state_t state = MSP_IDLE;
-    uint8_t msp_size = 0;
-    uint8_t msp_cmd = 0;
-    uint8_t msp_payload[256];
-    uint8_t msp_payload_idx = 0;
-    uint8_t calculated_checksum = 0;
 
-    char json_payload[512];
-    
-    ESP_LOGI("UART_RX", "Betaflight MSP Parser started...");
+     while (1) {
+        if (uart_read_bytes(UART_PORT_NUM, &byte_in, 1, pdMS_TO_TICKS(20)) > 0) {
+            switch (state) {
+ 
+                case WAIT_HEADER1:
+                    if (byte_in == HEADER1) {
+                        idx = 0;
+                        buf[idx] = byte_in; 
+                        idx++;
+                        state = WAIT_HEADER2;
+                    }
+                    
+                    break;
+                case WAIT_HEADER2:
+                    if (byte_in == HEADER2) {
+                        buf[idx] = byte_in; 
+                        idx++;
+                        state = READ_LENGTH;
+                    } // ถ้าไม่ตรง header ก็แค่ทิ้ง byte นี้ วนอ่านตัวถัดไปเรื่อยๆ
+                    break;
 
-    
-    while(1){
-        // Read incoming bytes one by one from UART buffer (with 10ms timeout)
-        int len = uart_read_bytes(UART_PORT_NUM, &byte_in, 1, pdMS_TO_TICKS(10));
-        if (len > 0) {
-            // State machine to parse MSP packet structure
-            switch(state) {
-                case MSP_IDLE:
-                    if (byte_in == '$') {
-                        state = MSP_HEADER_START;
+                case READ_LENGTH:
+                    if (byte_in == DATA_LEN) {
+                        buf[idx] = byte_in;
+                        idx++;
+                        state = READ_DATA;
+                    }
+ 
+                case READ_DATA:
+                    buf[idx] = byte_in;
+                    idx++;
+                    if (idx >= length-1) {      // อ่านถึงdata
+                        state = READ_CHECKSUM;
                     }
                     break;
-                    
-                case MSP_HEADER_START:
-                    if (byte_in == 'M') {
-                        state = MSP_HEADER_M;
-                    } else {
-                        state = MSP_IDLE; // Invalid header start, reset
-                    }
-                    break;
-                    
-                case MSP_HEADER_M:
-                    if (byte_in == '>') { // Confirm incoming response from FC to ESP32
-                        state = MSP_HEADER_ARROW;
-                    } else {
-                        state = MSP_IDLE;
-                    }
-                    break;
-                    
-                case MSP_HEADER_ARROW:
-                    msp_size = byte_in;
-                    calculated_checksum = byte_in; // Start XOR checksum calculation
-                    msp_payload_idx = 0;
-                    state = MSP_HEADER_SIZE;
-                    break;
-                    
-                case MSP_HEADER_SIZE:
-                    msp_cmd = byte_in;
-                    calculated_checksum ^= byte_in; // XOR command ID into checksum
-                    if (msp_size == 0) {
-                        state = MSP_CHECKSUM; // Jump directly to checksum verification if payload is empty
-                    } else {
-                        state = MSP_PAYLOAD;
-                    }
-                    break;
-                    
-                case MSP_PAYLOAD:
-                    msp_payload[msp_payload_idx] = byte_in;
-                    calculated_checksum ^= byte_in; // XOR payload bytes into checksum
-                    msp_payload_idx++;
-                    
-                    if (msp_payload_idx >= msp_size) {
-                        state = MSP_CHECKSUM;
-                    }
-                    break;
-                    
-                case MSP_CHECKSUM:
+ 
+                case READ_CHECKSUM:
+                    buf[idx] = byte_in;
+                    int calculated_checksum = calc_checksum(length-1, buf);
                     if (byte_in == calculated_checksum) {
-                        // Checksum matches. Decode payload binary content.
-                        parse_msp_packet(msp_cmd, msp_payload, msp_size);
-                        
-                        // Once new GPS coordinate is received, assemble telemetry into a JSON payload and queue it
-                        if (msp_cmd == MSP_RAW_GPS) {
-                            snprintf(json_payload, sizeof(json_payload),
-                                     "{"
-                                     "\"flight_mode\":\"AUTO\","
-                                     "\"latitude\":%.7f,"
-                                     "\"longitude\":%.7f,"
-                                     "\"altitude\":%.1f,"
-                                     "\"speed\":%.2f"
-                                     "}",
-                                     drone_data.latitude,
-                                     drone_data.longitude,
-                                     drone_data.altitude,
-                                     drone_data.speed
-                                    );
-                            
-                            // Send JSON string to HTTP Queue (non-blocking, drops packet if queue is full after 10ms)
-                            if (xQueueSend(http_queue, json_payload, pdMS_TO_TICKS(10)) != pdPASS) {
-                                ESP_LOGW("UART_RX", "HTTP queue full, drop telemetry!");
-                            }
-                        }
+                        monitor_packet_t data_packet;
+
+                        // ข้าม Header 
+                        memcpy(&data_packet, &buf[3], sizeof(monitor_packet_t));
+                        on_packet((const uint8_t *)&data_packet, sizeof(monitor_packet_t));   //มีแค่ data (22 bytes) ไม่รวม Header LENGTH และ Checksum
                     } else {
-                        ESP_LOGW("UART_RX", "MSP Checksum Error!");
+                        ESP_LOGW(TAG, "checksum mismatch, dropped");
+                        ESP_LOGW("RX_DEBUG", "Calculated: 0x%02X | Packet Expected: 0x%02X", 
+                                calculated_checksum, 
+                                byte_in); // เช็กว่ามันหยิบถูกช่องไหม
                     }
-                    state = MSP_IDLE; // Reset parser state for next packet
+                    state = WAIT_HEADER1;          // กลับไปรอ packet ใหม่เสมอ
                     break;
             }
         }
-        
-        // Yield CPU time if there is no data on UART
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 }

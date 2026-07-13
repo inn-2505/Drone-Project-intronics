@@ -4,7 +4,10 @@
 void init_uart(void);
 void tx_task(void *pvParameters);
 void rx_task(void* pvParameters);
-void parse_msp_packet(uint8_t cmd, uint8_t *payload, uint8_t size);
-void send_msp_command(uint8_t cmd, uint8_t *payload, uint8_t size);
+uint8_t calc_checksum(uint8_t len, const uint8_t *data);
+void uart_send(const uint8_t *data, size_t length);
+void on_packet(const uint8_t *data, size_t length);
+void convert2json(const uint8_t *data, char *json_buffer, size_t buffer_size);
+
 
 #endif
