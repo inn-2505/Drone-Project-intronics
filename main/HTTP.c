@@ -53,7 +53,7 @@ void send_http_post(const uint8_t *data, int len) {
         .url = DJANGO_API_URL,
         .event_handler = _http_event_handler,
         .method = HTTP_METHOD_POST,
-        .timeout_ms = 5000,
+        .timeout_ms = 1000,
     };
     
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -113,29 +113,43 @@ void convert2uart(const char *json_string)
     }
  
     // ดึงค่าแต่ละ key ออกมา  
+    cJSON *command_item   = cJSON_GetObjectItem(root, "command");
     cJSON *lat_1_item     = cJSON_GetObjectItem(root, "lat_1");
     cJSON *long_1_item    = cJSON_GetObjectItem(root, "long_1");
     cJSON *lat_2_item     = cJSON_GetObjectItem(root, "lat_2");
     cJSON *long_2_item    = cJSON_GetObjectItem(root, "long_2");
     cJSON *altitude_item  = cJSON_GetObjectItem(root, "altitude");
     cJSON *speed_item     = cJSON_GetObjectItem(root, "speed");
+    cJSON *throttle_item  = cJSON_GetObjectItem(root, "throttle");
+    cJSON *yaw_item       = cJSON_GetObjectItem(root, "yaw");
+    cJSON *pitch_item     = cJSON_GetObjectItem(root, "pitch");
+    cJSON *roll_item      = cJSON_GetObjectItem(root, "roll");
 
     // เช็คว่า field ที่ต้องมีครบไหม 
-    if (!lat_1_item || !long_1_item || !lat_2_item || !long_2_item || !altitude_item || !speed_item) {
+    if (!command_item || !lat_1_item || !long_1_item || !lat_2_item || !long_2_item || !altitude_item || !speed_item || !throttle_item || !yaw_item || !pitch_item || !roll_item) {
         ESP_LOGE(TAG, "JSON missing required fields!");
         cJSON_Delete(root);
         return;
     }
  
     drone_command_t payload;
-
     
-    payload.lat1     = (int32_t)(lat_1_item->valuedouble * 1000000);
+    if (command_item != NULL && cJSON_IsString(command_item)) {
+        const char *cmd_str = command_item->valuestring;
+        payload.command = command_str_to_mode(cmd_str);
+    } else {
+        ESP_LOGE(TAG, "Missing or invalid 'command' field (expected string)");
+        payload.command = 0;
+    }
     payload.lon1     = (int32_t)(long_1_item->valuedouble * 1000000);
     payload.lat2     = (int32_t)(lat_2_item->valuedouble * 1000000);
     payload.lon2     = (int32_t)(long_2_item->valuedouble * 1000000);
     payload.altitude = (uint16_t)altitude_item->valueint;
     payload.speed    = (uint8_t)speed_item->valueint;
+    payload.throttle = (uint8_t)throttle_item->valueint;
+    payload.yaw      = (uint8_t)yaw_item->valueint;
+    payload.pitch    = (uint8_t)pitch_item->valueint;
+    payload.roll     = (uint8_t)roll_item->valueint;
 
     if (xQueueSend(uart_tx_queue, &payload, pdMS_TO_TICKS(100)) != pdPASS) {
         ESP_LOGW(TAG, "uart_tx_queue full, command dropped!");

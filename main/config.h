@@ -12,7 +12,7 @@ extern QueueHandle_t uart_tx_queue;
 #define WIFI_PASS          "intronics029391222" 
 #define WIFI_CONNECTED_BIT BIT0
 // Django Server
-#define DJANGO_API_URL     "http://192.168.1.169:8000/api/data/"          
+#define DJANGO_API_URL     "http://192.168.1.166:8000/api/data" 
 
 #define UART_PORT_NUM       UART_NUM_0      
 #define UART_BAUD_RATE      115200                
@@ -23,7 +23,8 @@ extern QueueHandle_t uart_tx_queue;
 #define HEADER1      0xAA
 #define HEADER2      0x55
 
-#define DATA_LEN        22      // *** ขนาด data คงที่ ปรับตรงนี้ถ้า format เปลี่ยน ***
+#define DATA_LEN_MONITOR       22       // *** ขนาด data คงที่ ปรับตรงนี้ถ้า format เปลี่ยน ***
+#define DATA_LEN_COMMAND       24       // *** ขนาด data คงที่ ปรับตรงนี้ถ้า format เปลี่ยน ***
 
 #define UDP_PORT 1234
 

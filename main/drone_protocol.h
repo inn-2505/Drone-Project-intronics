@@ -1,6 +1,6 @@
 #ifndef drone_protocol_H
 #define drone_protocol_H
-
+#include <string.h>
 // Define the structure of the drone monitoring packet
 typedef enum {
     WAIT_HEADER1,  
@@ -38,11 +38,30 @@ static inline const char* get_flight_mode_str(uint8_t mode) {
 
 //define the structure of the command drone packet
 typedef struct {
+    uint8_t command;     // 1 Byte
     int32_t lat1;       // 4 Byte
     int32_t lon1;       // 4 Byte
     int32_t lat2;       // 4 Byte
     int32_t lon2;       // 4 Byte
     uint16_t altitude;  // 2 Byte
     uint8_t speed;      // 1 Byte
-} __attribute__((packed)) drone_command_t; // 19 Byte
+    uint8_t throttle;   // 1 Byte
+    uint8_t yaw;        // 1 Byte
+    uint8_t pitch;      // 1 Byte
+    uint8_t roll;       // 1 Byte
+} __attribute__((packed)) drone_command_t; // 24 Byte
+
+typedef enum {
+    COMMAND_MODE_ARM   = 1,
+    COMMAND_MODE_DISARM = 2,
+    COMMAND_MODE_EMERGENCY  = 3,
+} command_mode_t;
+
+static inline uint8_t command_str_to_mode(const char *cmd_str) {
+    if (strcmp(cmd_str, "ARM") == 0)       return COMMAND_MODE_ARM;
+    if (strcmp(cmd_str, "DISARM") == 0)    return COMMAND_MODE_DISARM;
+    if (strcmp(cmd_str, "EMERGENCY") == 0) return COMMAND_MODE_EMERGENCY;
+    return 0; // ไม่รู้จัก / ค่า default
+}
+
 #endif

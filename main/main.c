@@ -29,12 +29,17 @@ void run_server_simulation_test(void) {
     // 1. 📦 สร้างและหยอดข้อมูลใส่ Struct คำสั่ง (19 Byte) ตรงๆ ตามที่คุณบอก
     
     const char *mock_json = "{"
+                            "\"command\": \"ARM\","
                             "\"lat_1\": 13.756300,"
                             "\"long_1\": 100.501800,"
                             "\"lat_2\": 14.123456,"
                             "\"long_2\": 101.987654,"
                             "\"altitude\": 100,"
                             "\"speed\": 25"
+                            ",\"throttle\": 50,"
+                            "\"yaw\": 10,"
+                            "\"pitch\": 5,"
+                            "\"roll\": 0"
                             "}";
     ESP_LOGI("TEST", "Sending prepared JSON string directly to your transmitter...");
 
@@ -59,9 +64,9 @@ void init_state()
 
 void app_main(void)
 {
+    init_state();
     
-    
-    uart_tx_queue = xQueueCreate(10, sizeof(uint8_t) * DATA_LEN);
+    uart_tx_queue = xQueueCreate(10, sizeof(uint8_t) * DATA_LEN_COMMAND);
     http_queue = xQueueCreate(10, 256);
 
     // สั่งจองขนาดคิวให้เก็บสตริง JSON 512 ไบต์ ได้สูงสุด 10 คิว
@@ -86,8 +91,6 @@ void app_main(void)
     // Wi-Fi & UART
     wifi_init_sta();
     init_uart();
-
-    init_state();
     ESP_LOGI("MAIN", "Initialization finished.");
     
     // Task UART , HTTP POST  
@@ -97,5 +100,5 @@ void app_main(void)
     xTaskCreate(tx_task, "uart_tx_task", 8192, NULL,5, NULL);
     xTaskCreate(rx_task, "uart_rx_task",8192, NULL,6,NULL);
     xTaskCreate(drone_sim_task, "drone_simulator", 4096, NULL, 2, NULL);
-    run_server_simulation_test() ;
+    // run_server_simulation_test() ;
 }

@@ -41,12 +41,13 @@ void init_uart(void) {
 
 void uart_send(const uint8_t *data, size_t length)
 {
-    //  Header (1 Byte) + Data (19 Byte) = 20 Byte
-    size_t packet_len = 1 + length;
+    //  Header (2 Byte) + Data (24 Byte) = 25 Byte
+    size_t packet_len = 2 + length;
     uint8_t packet[packet_len];
 
-    packet[0] = HEADER;
-    memcpy(&packet[1], data, length);
+    packet[0] = HEADER1;
+    packet[1] = HEADER2;
+    memcpy(&packet[2], data, length);
     uint8_t checksum = calc_checksum(packet_len, packet);
 
     uart_write_bytes(UART_PORT_NUM, (const char *)packet, packet_len); // ยิง Header + Data
@@ -56,31 +57,37 @@ void uart_send(const uint8_t *data, size_t length)
 
 void tx_task(void *pvParameters)
 {   
-    uint8_t payload[DATA_LEN];
+    uint8_t payload[DATA_LEN_COMMAND]; // ขนาด 24 Byte (Command Packet)
     ESP_LOGI(TAG, "uart_tx_queue Task is running and waiting for Queue...");
     
     while (1) {
         // รอรับข้อความในคิว
         if (xQueueReceive(uart_tx_queue, payload, portMAX_DELAY) == pdPASS) {
+            uint8_t command;
             int32_t lat1, lon1, lat2, lon2;
             uint16_t alt;
-            uint8_t speed;
+            uint8_t speed, throttle, yaw, pitch, roll;
+            command = payload[0]; 
+            memcpy(&lat1,  &payload[1],  4);
+            memcpy(&lon1,  &payload[5],  4);
+            memcpy(&lat2,  &payload[9],  4);
+            memcpy(&lon2,  &payload[13], 4);
+            memcpy(&alt,   &payload[17], 2);
+            speed = payload[19]; 
+            throttle = payload[20];
+            yaw = payload[21];
+            pitch = payload[22];
+            roll = payload[23];
 
-            memcpy(&lat1,  &payload[0],  4);
-            memcpy(&lon1,  &payload[4],  4);
-            memcpy(&lat2,  &payload[8],  4);
-            memcpy(&lon2,  &payload[12], 4);
-            memcpy(&alt,   &payload[16], 2);
-            speed = payload[18]; 
 
             // หาร 1,000,000.0 เพื่อให้กลับเป็นทศนิยม
-            ESP_LOGI("UART_TX", "Sending Data -> P1: (%.6f, %.6f) | P2: (%.6f, %.6f) | Alt: %d m | Spd: %d km/h",
-                     lat1 / 1000000.0, lon1 / 1000000.0, 
-                     lat2 / 1000000.0, lon2 / 1000000.0, 
-                     alt, speed);
+            ESP_LOGI("UART_TX", "Sending Data -> P1: (%.6f, %.6f) | P2: (%.6f, %.6f) | Alt: %u m | Spd: %u km/h | Th: %u, Y: %u, P: %u, R: %u",
+         lat1 / 1000000.0, lon1 / 1000000.0, 
+         lat2 / 1000000.0, lon2 / 1000000.0, 
+         alt, speed, throttle, yaw, pitch, roll);
 
             
-            uart_send(payload, DATA_LEN);       
+            uart_send(payload, DATA_LEN_COMMAND);       
         }
     }
     
@@ -96,17 +103,17 @@ void convert2json(const uint8_t *data, char *json_buffer, size_t buffer_size)
     // ประกอบเป็น JSON string
     snprintf(json_buffer, buffer_size,
              "{"
-             "\"flight_mode\":%s,"
-             "\"latitude\":%ld,"
-             "\"longitude\":%ld,"
-             "\"altitude\":%d,"
-             "\"speed\":%u,"
+             "\"flight_mode\":\"%s\","
+             "\"latitude\":%.6f,"
+             "\"longitude\":%.6f,"
+             "\"altitude\":%.2f,"
+             "\"speed\":%.2f,"
              "\"battery_voltage\":%.2f,"
              "\"battery_percentage\":%u"
              "}",
              get_flight_mode_str(parsed.flight_mode),
-             parsed.latitude,
-             parsed.longitude,
+             parsed.latitude / 1000000.0,
+             parsed.longitude / 1000000.0,
              parsed.altitude,
              parsed.speed,
              parsed.batt_voltage,
@@ -134,10 +141,11 @@ void on_packet(const uint8_t *data,size_t length)
 
 
 void rx_task(void *pvParameters)
-{
-    state_t state = WAIT_HEADER;
+{   
+    ESP_LOGI(TAG, "rx_task started successfully!");
+    state_t state = WAIT_HEADER1;
     
-    size_t length = sizeof(monitor_packet_t) + 4; // 22 bytes (data) + 2 byte (header) + 1 byte (payload_len) + 1 byte (checksum)
+    size_t length = sizeof(monitor_packet_t) + 3; // 22 bytes (data) + 2 byte (header)  + 1 byte (checksum)
     static uint8_t buf[256];
     uint8_t idx = 0;
     uint8_t byte_in;
@@ -165,11 +173,12 @@ void rx_task(void *pvParameters)
                     break;
 
                 case READ_LENGTH:
-                    if (byte_in == DATA_LEN) {
+                    if (byte_in == DATA_LEN_MONITOR) { 
                         buf[idx] = byte_in;
                         idx++;
                         state = READ_DATA;
                     }
+                    break;
  
                 case READ_DATA:
                     buf[idx] = byte_in;

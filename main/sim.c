@@ -14,19 +14,19 @@ void drone_sim_task(void *pvParameters)
 {
     uint8_t sim_counter = 0;
     
-    // ขนาดโครงสร้างข้อมูลจริง = 17 Byte
+    // ขนาดโครงสร้างข้อมูลจริง = 22 Byte
     size_t data_len = sizeof(monitor_packet_t); 
-    // ขนาดรวมทั้งแพ็กเกจ = 1 + 17 + 1 = 19 Byte
-    size_t total_length = 1 + data_len + 1; 
+    // ขนาดรวมทั้งแพ็กเกจ = 2 + 1 + 22 + 1 = 26 Byte
+    size_t total_length = 2 + 1  + data_len + 1; 
     
     uint8_t tx_buffer[total_length];
 
-    ESP_LOGI(TAG, "🤖 [UART SIM] Drone Simulator Started! (17-Byte Struct Mode)");
+    ESP_LOGI(TAG, "🤖 [UART SIM] Drone Simulator Started! (22-Byte Struct Mode)");
 
     while (1) {
         sim_counter++;
 
-        // 1. 📝 สร้างและหยอดข้อมูลจำลองลงโครงสร้าง 17 ไบต์ของคุณ
+        // 1. 📝 สร้างและหยอดข้อมูลจำลองลงโครงสร้าง 22 ไบต์ของคุณ
         monitor_packet_t sim_packet;
         
         sim_packet.flight_mode     = 2; // สมมติให้เป็นโหมด TAKEOFF (เลข 2 จาก enum)
@@ -41,16 +41,18 @@ void drone_sim_task(void *pvParameters)
         sim_packet.batt_percentage = 100 - (sim_counter % 10);
 
         // 2. 📦 บรรจุลงสายพานส่งข้อมูล (tx_buffer)
-        tx_buffer[0] = HEADER; // ช่อง 0 ยัด Header
+        tx_buffer[0] = HEADER1; // ช่อง 0 ยัด Header
+        tx_buffer[1] = HEADER2; // ช่อง 1 ยัด Header
+        tx_buffer[2] = data_len; // ช่อง 2 ยัด Payload Length (22 Byte)
         
-        // ช่อง 1 ถึง 17 ก๊อปปี้ข้อมูลสตรัคลงไป
-        memcpy(&tx_buffer[1], &sim_packet, data_len); 
+        // ช่อง 2 ถึง 23 ก๊อปปี้ข้อมูลสตรัคลงไป
+        memcpy(&tx_buffer[3], &sim_packet, data_len); 
 
-        // 3. 🧮 คำนวณ Checksum ทั้งก้อน (Header 1 Byte + Data 17 Byte = 18 Byte)
+        // 3. 🧮 คำนวณ Checksum ทั้งก้อน (Header 2 Byte + Data 22 Byte = 24 Byte)
         size_t check_len = total_length - 1; 
         uint8_t checksum_val = calc_checksum(check_len, tx_buffer);
         
-        // ช่องที่ 18 (ตัวสุดท้าย) ยัด Checksum ปิดท้าย
+        // ช่องที่ 25 (ตัวสุดท้าย) ยัด Checksum ปิดท้าย
         tx_buffer[total_length - 1] = checksum_val;
 
         // 4. ปริ้นต์ Log ตรวจสอบความถูกต้องก่อนยิงออก
@@ -59,10 +61,10 @@ void drone_sim_task(void *pvParameters)
                  sim_packet.batt_voltage, 
                  tx_buffer[total_length - 1]);
 
-        // 5. 🚀 ยิงออกพอร์ต UART ทั้งหมด 19 ไบต์รวดเดียว
+        // 5. 🚀 ยิงออกพอร์ต UART ทั้งหมด 26 ไบต์รวดเดียว
         uart_write_bytes(UART_PORT_NUM, (const char *)tx_buffer, total_length);
 
         // 6. หน่วงเวลาส่งข้อมูลทุกๆ 3 วินาที
-        vTaskDelay(pdMS_TO_TICKS(3000));
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
