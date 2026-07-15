@@ -79,15 +79,27 @@ void tx_task(void *pvParameters)
             pitch = payload[22];
             roll = payload[23];
 
-
+            // 1. Log แสดงผลแบบอ่านรู้เรื่อง
             // หาร 1,000,000.0 เพื่อให้กลับเป็นทศนิยม
-            ESP_LOGI("UART_TX", "Sending Data -> P1: (%.6f, %.6f) | P2: (%.6f, %.6f) | Alt: %u m | Spd: %u km/h | Th: %u, Y: %u, P: %u, R: %u",
-         lat1 / 1000000.0, lon1 / 1000000.0, 
+            ESP_LOGI("UART_TX", "Sending Data -> C:%u P1: (%.6f, %.6f) | P2: (%.6f, %.6f) | Alt: %u m | Spd: %u km/h | Th: %u, Y: %u, P: %u, R: %u",
+         command, lat1 / 1000000.0, lon1 / 1000000.0, 
          lat2 / 1000000.0, lon2 / 1000000.0, 
          alt, speed, throttle, yaw, pitch, roll);
-
+            // =======================================================
+            // 2. ประกอบร่างแพ็กเกจเต็ม (Header + Length + Data + Checksum)
+            // ขนาดรวม: Header(2) + Length(1) + Data(24) + Checksum(1) = 28 Bytes
+            // =======================================================
+            size_t total_packet_length = DATA_LEN_COMMAND + 4; // 24 + 4 = 28 Bytes
+            uint8_t tx_buffer[total_packet_length];
+            tx_buffer[0] = HEADER1;
+            tx_buffer[1] = HEADER2;
+            tx_buffer[2] = DATA_LEN_COMMAND; // Length = 24 Bytes
+            memcpy(&tx_buffer[3], payload, DATA_LEN_COMMAND); // Copy Data (24 Bytes) to tx_buffer 
             
-            uart_send(payload, DATA_LEN_COMMAND);       
+            uint8_t checksum = calc_checksum(DATA_LEN_COMMAND + 3, tx_buffer); // คำนวณ Checksum (รวม Header + Length + Data)
+            tx_buffer[total_packet_length-1] = checksum; // ใส่ Checksum ปิดท้าย
+            ESP_LOG_BUFFER_HEX("UART_TX_FULL_PACKET", tx_buffer, total_packet_length);
+            uart_send(tx_buffer, total_packet_length);       
         }
     }
     

@@ -114,12 +114,12 @@ void convert2uart(const char *json_string)
  
     // ดึงค่าแต่ละ key ออกมา  
     cJSON *command_item   = cJSON_GetObjectItem(root, "command");
-    cJSON *lat_1_item     = cJSON_GetObjectItem(root, "lat_1");
-    cJSON *long_1_item    = cJSON_GetObjectItem(root, "long_1");
-    cJSON *lat_2_item     = cJSON_GetObjectItem(root, "lat_2");
-    cJSON *long_2_item    = cJSON_GetObjectItem(root, "long_2");
-    cJSON *altitude_item  = cJSON_GetObjectItem(root, "altitude");
-    cJSON *speed_item     = cJSON_GetObjectItem(root, "speed");
+    cJSON *lat_1_item     = cJSON_GetObjectItem(root, "lat1");
+    cJSON *long_1_item    = cJSON_GetObjectItem(root, "lon1");
+    cJSON *lat_2_item     = cJSON_GetObjectItem(root, "lat2");
+    cJSON *long_2_item    = cJSON_GetObjectItem(root, "lon2");
+    cJSON *altitude_item  = cJSON_GetObjectItem(root, "alt");
+    cJSON *speed_item     = cJSON_GetObjectItem(root, "spd");
     cJSON *throttle_item  = cJSON_GetObjectItem(root, "throttle");
     cJSON *yaw_item       = cJSON_GetObjectItem(root, "yaw");
     cJSON *pitch_item     = cJSON_GetObjectItem(root, "pitch");
@@ -141,6 +141,7 @@ void convert2uart(const char *json_string)
         ESP_LOGE(TAG, "Missing or invalid 'command' field (expected string)");
         payload.command = 0;
     }
+    payload.lat1     = (int32_t)(lat_1_item->valuedouble * 1000000);
     payload.lon1     = (int32_t)(long_1_item->valuedouble * 1000000);
     payload.lat2     = (int32_t)(lat_2_item->valuedouble * 1000000);
     payload.lon2     = (int32_t)(long_2_item->valuedouble * 1000000);
