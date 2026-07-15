@@ -2,7 +2,8 @@
   "C_Cpp.intelliSenseEngine": "default",
   "idf.extensionActivationMode": "always",
   "idf.openOcdConfigs": [
-    "board/esp32c6-builtin.cfg"
+    "interface/ftdi/esp32_devkitj_v1.cfg",
+    "target/esp32.cfg"
   ],
   "idf.currentSetup": "C:\\esp\\v5.4.4\\esp-idf",
   "idf.customExtraVars": {
@@ -16,5 +17,5 @@
   ],
   "C_Cpp.errorSquiggles": "disabled",
   "idf.flashType": "UART",
-  "idf.portWin": "COM13"
+  "idf.portWin": "COM9"
 }

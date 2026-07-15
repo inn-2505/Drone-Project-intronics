@@ -21,6 +21,20 @@ static const char *TAG = "TIME_DEBUG";
 QueueHandle_t http_queue = NULL;
 QueueHandle_t uart_tx_queue = NULL;
 
+void gpio_loopback_test(void) {
+    gpio_reset_pin(GPIO_NUM_17);
+    gpio_reset_pin(GPIO_NUM_16);
+    gpio_set_direction(GPIO_NUM_17, GPIO_MODE_OUTPUT);
+    gpio_set_direction(GPIO_NUM_16, GPIO_MODE_INPUT);
+    while (1) {
+        gpio_set_level(GPIO_NUM_17, 1);
+        vTaskDelay(pdMS_TO_TICKS(300));
+        ESP_LOGI("PINTEST", "set 17=HIGH -> read 16=%d (ต้องการ 1)", gpio_get_level(GPIO_NUM_16));
+                gpio_set_level(GPIO_NUM_17, 0);
+        vTaskDelay(pdMS_TO_TICKS(300));
+        ESP_LOGI("PINTEST", "set 17=LOW  -> read 16=%d (ต้องการ 0)", gpio_get_level(GPIO_NUM_16));
+    }
+}
 void run_server_simulation_test(void) {
     ESP_LOGI("TEST", "========================================");
     ESP_LOGI("TEST", "🧪 RUNNING SERVER COMMAND TRANSMIT TEST...");
@@ -66,6 +80,10 @@ void app_main(void)
 {
     init_state();
     
+     // ===== DEBUG: ทดสอบสาย jumper GPIO16-17 ล้วนๆ ก่อน ยังไม่ยุ่งกับ UART/WiFi =====
+    //gpio_loopback_test();
+    //return; // หยุดตรงนี้ ไม่รันโค้ดส่วนที่เหลือระหว่างเทส
+    // ===== เทสเสร็จแล้วค่อยลบ 2 บรรทัดบนนี้ออก แล้ว build โค้ดจริงต่อ =====
     uart_tx_queue = xQueueCreate(10, sizeof(uint8_t) * DATA_LEN_COMMAND);
     http_queue = xQueueCreate(10, 256);
 

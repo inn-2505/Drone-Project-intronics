@@ -145,7 +145,7 @@ void rx_task(void *pvParameters)
     ESP_LOGI(TAG, "rx_task started successfully!");
     state_t state = WAIT_HEADER1;
     
-    size_t length = sizeof(monitor_packet_t) + 3; // 22 bytes (data) + 2 byte (header)  + 1 byte (checksum)
+    size_t length = sizeof(monitor_packet_t) + 4; // 22 bytes (data)+ 1 length + 2 byte (header)  + 1 byte (checksum)
     static uint8_t buf[256];
     uint8_t idx = 0;
     uint8_t byte_in;
@@ -153,6 +153,7 @@ void rx_task(void *pvParameters)
 
      while (1) {
         if (uart_read_bytes(UART_PORT_NUM, &byte_in, 1, pdMS_TO_TICKS(20)) > 0) {
+             //ESP_LOGI("RX_RAW", "byte: 0x%02X", byte_in); // DEBUG: เช็คว่ามี byte ใดๆ เข้ามาทาง RX จริงไหม (ลบทิ้งภายหลัง)
             switch (state) {
  
                 case WAIT_HEADER1:
@@ -183,7 +184,7 @@ void rx_task(void *pvParameters)
                 case READ_DATA:
                     buf[idx] = byte_in;
                     idx++;
-                    if (idx >= length-1) {      // อ่านถึงdata
+                    if (idx >= length-1) {      // อ่านถึงdata ครบ 22 byte แล้ว (แก้ off-by-one
                         state = READ_CHECKSUM;
                     }
                     break;
