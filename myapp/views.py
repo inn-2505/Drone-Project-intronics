@@ -274,7 +274,20 @@ def manual_control_view(request):
                 return JsonResponse({'status': 'error', 'message': 'ESP32 IP not found'}, status=400)
                 
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            payload = json.dumps({"throttle": throttle, "yaw": yaw, "pitch": pitch, "roll": roll})
+            # 🌟 ส่งครบทุก field ตามที่ convert2uart() ฝั่ง ESP32 ต้องการ (ไม่งั้นโดนทิ้งเพราะ "JSON missing required fields!")
+            payload = json.dumps({
+                "command": command,
+                "lat1": float(lat1),
+                "lon1": float(lon1),
+                "lat2": float(lat2),
+                "lon2": float(lon2),
+                "alt": float(alt),
+                "spd": float(spd),
+                "throttle": throttle,
+                "yaw": yaw,
+                "pitch": pitch,
+                "roll": roll
+            })
             sock.sendto(payload.encode('utf-8'), (esp_ip, ESP32_UDP_PORT))
             sock.close()
             
