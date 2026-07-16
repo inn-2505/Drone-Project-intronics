@@ -17,6 +17,36 @@
 
 static const char *TAG = "NETWORKCONTROL";
 
+// =============================================================
+//      ฟังก์ชันส่ง UDP String (แทนที่ send_http_post เดิม)
+// =============================================================
+void send_udp_packet(const char *json_string, int len) {
+    int addr_family = AF_INET;
+    int ip_protocol = IPPROTO_IP;
+
+    struct sockaddr_in dest_addr;
+    dest_addr.sin_addr.s_addr = inet_addr(DJANGO_API_URL);
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_port = htons(UDP_PORT_SEND);
+
+    // 1. สร้าง UDP Socket
+    int sock = socket(addr_family, SOCK_DGRAM, ip_protocol);
+    if (sock < 0) {
+        ESP_LOGE(TAG, "Unable to create socket for sending: errno %d", errno);
+        return;
+    }
+
+    // 2. ส่ง JSON string ออกไป
+    int err = sendto(sock, json_string, len, 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+    if (err < 0) {
+        ESP_LOGE(TAG, "Error occurred during UDP transmission: errno %d", errno);
+    } else {
+        ESP_LOGI(TAG, "Sent Telemetry UDP to Django successfully!");
+    }
+
+    // 3. ปิด Socket ทุกครั้งเพื่อเคลียร์ RAM
+    close(sock);
+}
 
 // HTTP Event Handler 
 static esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
@@ -88,8 +118,9 @@ void http_sender_task(void *pvParameters) {
         if (xQueueReceive(http_queue, json_payload, portMAX_DELAY) == pdPASS) {
             ESP_LOGI(TAG, "Queue item found! Sending HTTP POST: %s", json_payload);
             
+            send_udp_packet(json_payload, strlen(json_payload));
             // สั่งส่งข้อมูล JSON ยิงหา Server Django
-            send_http_post((uint8_t *)json_payload, strlen(json_payload));
+            //send_http_post((uint8_t *)json_payload, strlen(json_payload));
         }
     }
     
