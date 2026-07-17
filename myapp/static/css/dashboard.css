@@ -40,9 +40,6 @@ th { background: #1f4068; color: #00f2fe; }
 
 /* Status Badges */
 .badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; }
-.STABILIZE { background: #0275d8; }
-.ALT_HOLD { background: #f0ad4e; }
-.LOITER { background: #4e9f3d; }
-.RTL { background: #6f42c1; }
-.ARM { background: #28a745; }
-.DISARM { background: #dc3545; }
+.LAND { background: #0275d8; }
+.CHARGE { background: #28a745; }
+.TAKEOFF { background: #dc3545; }

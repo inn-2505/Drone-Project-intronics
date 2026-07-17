@@ -58,8 +58,3 @@ class DroneConsumer(AsyncWebsocketConsumer):
             'type': 'MODE_CHANGE',
             'data': data
         }))
-        
-    @database_sync_to_async
-    def save_command(self, command_text):
-        # บันทึกคำสั่งลงตาราง drone_f722_command โดยกำหนดสถานะเริ่มต้นเป็น PENDING (หรือ SENT ตามต้องการ)
-        return DroneCommand.objects.create(command=command_text, status="PENDING")

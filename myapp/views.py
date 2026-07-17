@@ -24,94 +24,95 @@ def control_view(request):
     return render(request, 'control.html')
 
 @csrf_exempt # allow ESP32 to send data without CSRF token
-def receive_data(request):
-    if request.method == 'GET':
-        try:
-            latest_status = DroneStatus.objects.first()
+
+# def receive_data(request):
+#     if request.method == 'GET':
+#         try:
+#             latest_status = DroneStatus.objects.first()
             
-            if latest_status:
-                return JsonResponse({
-                    'status': 'success',
-                    'latitude': float(latest_status.latitude) if latest_status.latitude else None,
-                    'longitude': float(latest_status.longitude) if latest_status.longitude else None,
-                    'flight_mode': latest_status.flight_mode,
-                    'altitude': float(latest_status.altitude)
-                }, status=200)
-            else:
-                return JsonResponse({
-                    'status': 'empty',
-                    'message': 'No drone data available yet.'
-                }, status=200)
+#             if latest_status:
+#                 return JsonResponse({
+#                     'status': 'success',
+#                     'latitude': float(latest_status.latitude) if latest_status.latitude else None,
+#                     'longitude': float(latest_status.longitude) if latest_status.longitude else None,
+#                     'flight_mode': latest_status.flight_mode,
+#                     'altitude': float(latest_status.altitude)
+#                 }, status=200)
+#             else:
+#                 return JsonResponse({
+#                     'status': 'empty',
+#                     'message': 'No drone data available yet.'
+#                 }, status=200)
                 
-        except Exception as e:
-            return JsonResponse({'status': 'error',
-                                 'message': str(e)},
-                                 status=500)
+#         except Exception as e:
+#             return JsonResponse({'status': 'error',
+#                                  'message': str(e)},
+#                                  status=500)
 
-    elif request.method == 'POST':
-        try:
-            # store ESP32 IP in cache for 5 minutes
-            esp_ip = request.META.get('REMOTE_ADDR')
-            cache.set('esp32_ip', esp_ip, timeout=300)
+#     elif request.method == 'POST':
+#         try:
+#             # store ESP32 IP in cache for 5 minutes
+#             esp_ip = request.META.get('REMOTE_ADDR')
+#             cache.set('esp32_ip', esp_ip, timeout=300)
             
-            # read JSON from ESP32
-            data = json.loads(request.body)
+#             # read JSON from ESP32
+#             data = json.loads(request.body)
             
-            # extract values from JSON
-            flight_mode = data.get('flight_mode', 'DISARM') or 'DISARM'
-            latitude = data.get('latitude')
-            longitude = data.get('longitude')
-            altitude = data.get('altitude') if data.get('altitude') is not None else 0.00
-            speed = data.get('speed') if data.get('speed') is not None else 0.00
-            battery_voltage = data.get('battery_voltage') if data.get('battery_voltage') is not None else 0.00
-            battery_percentage = data.get('battery_percentage') if data.get('battery_percentage') is not None else 100
+#             # extract values from JSON
+#             flight_mode = data.get('flight_mode', 'DISARM') or 'DISARM'
+#             latitude = data.get('latitude')
+#             longitude = data.get('longitude')
+#             altitude = data.get('altitude') if data.get('altitude') is not None else 0.00
+#             speed = data.get('speed') if data.get('speed') is not None else 0.00
+#             battery_voltage = data.get('battery_voltage') if data.get('battery_voltage') is not None else 0.00
+#             battery_percentage = data.get('battery_percentage') if data.get('battery_percentage') is not None else 100
 
-            # insert into PostgreSQL
-            new_data = DroneStatus.objects.create(
-                flight_mode=flight_mode,
-                latitude=latitude,
-                longitude=longitude,
-                altitude=altitude,
-                speed=speed,
-                battery_voltage=battery_voltage,
-                battery_percentage=battery_percentage
-            )
+#             # insert into PostgreSQL
+#             new_data = DroneStatus.objects.create(
+#                 flight_mode=flight_mode,
+#                 latitude=latitude,
+#                 longitude=longitude,
+#                 altitude=altitude,
+#                 speed=speed,
+#                 battery_voltage=battery_voltage,
+#                 battery_percentage=battery_percentage
+#             )
 
-            # send real-time telemetry data to WebSocket group            
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                "drone_f722_control",
-                {
-                    "type": "drone_telemetry_message",
-                    "data": {
-                        "flight_mode": flight_mode,
-                        "latitude": str(latitude) if latitude is not None else None,
-                        "longitude": str(longitude) if longitude is not None else None,
-                        "altitude": str(altitude),
-                        "speed": str(speed),
-                        "battery_voltage": str(battery_voltage),
-                        "battery_percentage": battery_percentage,
-                        "timestamp": new_data.timestamp.strftime("%d/%m/%Y %H:%M:%S")
-                    }
-                }
-            )
+#             # send real-time telemetry data to WebSocket group            
+#             channel_layer = get_channel_layer()
+#             async_to_sync(channel_layer.group_send)(
+#                 "drone_f722_control",
+#                 {
+#                     "type": "drone_telemetry_message",
+#                     "data": {
+#                         "flight_mode": flight_mode,
+#                         "latitude": str(latitude) if latitude is not None else None,
+#                         "longitude": str(longitude) if longitude is not None else None,
+#                         "altitude": str(altitude),
+#                         "speed": str(speed),
+#                         "battery_voltage": str(battery_voltage),
+#                         "battery_percentage": battery_percentage,
+#                         "timestamp": new_data.timestamp.strftime("%d/%m/%Y %H:%M:%S")
+#                     }
+#                 }
+#             )
 
-            return JsonResponse({
-                'status': 'success', 
-                'message': 'Real-time telemetry data inserted successfully.'
-            }, status=201)
+#             return JsonResponse({
+#                 'status': 'success', 
+#                 'message': 'Real-time telemetry data inserted successfully.'
+#             }, status=201)
         
-        except Exception as e:
-            print(traceback.format_exc())
-            return JsonResponse({
-                'status': 'error', 
-                'message': str(e)
-            }, status=400)
+#         except Exception as e:
+#             print(traceback.format_exc())
+#             return JsonResponse({
+#                 'status': 'error', 
+#                 'message': str(e)
+#             }, status=400)
         
-    return JsonResponse({
-        'status': 'failed', 
-        'message': 'Only POST method is allowed.'
-    }, status=405)
+#     return JsonResponse({
+#         'status': 'failed', 
+#         'message': 'Only POST method is allowed.'
+#     }, status=405)
 
 @csrf_exempt  # receive command from dashboard/control and send to ESP32 via UDP
 def send_udp_command(request):
@@ -274,7 +275,21 @@ def manual_control_view(request):
                 return JsonResponse({'status': 'error', 'message': 'ESP32 IP not found'}, status=400)
                 
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            payload = json.dumps({"throttle": throttle, "yaw": yaw, "pitch": pitch, "roll": roll})
+            payload = json.dumps(
+                {
+                    "command": command,
+                    "lat1": float(lat1),
+                    "lon1": float(lon1),
+                    "lat2": float(lat2),
+                    "lon2": float(lon2),
+                    "alt": float(alt),
+                    "spd": float(spd),
+                    "throttle": int(throttle),
+                    "yaw": int(yaw),
+                    "pitch": int(pitch),
+                    "roll": int(roll)
+                }
+            )
             sock.sendto(payload.encode('utf-8'), (esp_ip, ESP32_UDP_PORT))
             sock.close()
             

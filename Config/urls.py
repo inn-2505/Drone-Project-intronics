@@ -22,7 +22,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.dashboard, name='dashboard'),
     path('control/', views.control_view, name='control_page'),
-    path('api/data/', views.receive_data, name='receive_data'),
+    # path('api/data/', views.receive_data, name='receive_data'),
     path('api/command/', views.send_udp_command, name='send_udp_command'),
     path('api/manual-control/', views.manual_control_view, name='manual_control'),
     path('api/switch-mode/', views.switch_mode_view, name='switch_mode')
