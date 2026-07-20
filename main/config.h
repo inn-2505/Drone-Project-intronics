@@ -13,8 +13,8 @@ extern QueueHandle_t uart_tx_queue;
 #define WIFI_CONNECTED_BIT BIT0
 // Django Server
 // #define DJANGO_API_URL     "http://192.168.1.166:8000/api/data/" //MY COMPUTER
-#define DJANGO_API_URL     "http://192.168.1.130:8000/api/data/" //GENE
-#define DJANGO_UDP_IP      "192.168.1.130"
+#define DJANGO_API_URL     "http://192.168.1.111:8000/api/data/" //GENE
+#define DJANGO_UDP_IP      "192.168.1.111"
 
 #define UART_PORT_NUM       UART_NUM_0  
 #define UART_BAUD_RATE      115200                

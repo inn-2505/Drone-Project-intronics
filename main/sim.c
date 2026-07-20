@@ -22,14 +22,14 @@ void drone_sim_task(void *pvParameters)
     uint8_t tx_buffer[total_length];
 
     ESP_LOGI(TAG, "🤖 [UART SIM] Drone Simulator Started! (22-Byte Struct Mode)");
-
+    int i = 1;
     while (1) {
         sim_counter++;
 
         // 1. 📝 สร้างและหยอดข้อมูลจำลองลงโครงสร้าง 22 ไบต์ของคุณ
         monitor_packet_t sim_packet;
-        
-        sim_packet.flight_mode     = 2; // สมมติให้เป็นโหมด TAKEOFF (เลข 2 จาก enum)
+        sim_packet.flight_mode = i;
+        i++;
         sim_packet.latitude        = (int32_t)(13.756300 * 1000000);
         sim_packet.longitude       = (int32_t)(100.501800 * 1000000);
         sim_packet.altitude        = 50 + (sim_counter % 5); // ความสูงขยับ 50-54 เมตร
@@ -64,7 +64,10 @@ void drone_sim_task(void *pvParameters)
         // 5. 🚀 ยิงออกพอร์ต UART ทั้งหมด 26 ไบต์รวดเดียว
         uart_write_bytes(UART_PORT_NUM, (const char *)tx_buffer, total_length);
 
-        // 6. หน่วงเวลาส่งข้อมูลทุกๆ 3 วินาที
-        vTaskDelay(pdMS_TO_TICKS(500));
+        
+        vTaskDelay(pdMS_TO_TICKS(200));
+        if (i > 3) {
+            i = 1;
+        }
     }
 }
