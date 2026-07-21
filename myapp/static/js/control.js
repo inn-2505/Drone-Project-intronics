@@ -2,8 +2,8 @@
 let isManualModeActive = false;
 
 const keyBtnMap = {
-    'w': 'btn-th-up',
-    's': 'btn-th-down',
+    // 'w': 'btn-th-up',
+    // 's': 'btn-th-down',
     'a': 'btn-yaw-left',
     'd': 'btn-yaw-right',
     'arrowup': 'btn-pitch-fwd',
@@ -14,10 +14,10 @@ const keyBtnMap = {
 
 let isArmed = false;
 
-let throttle = 0;
-let yaw = 0;
-let pitch = 0;
-let roll = 0;
+let throttle = 1500;
+let yaw = 1500;
+let pitch = 1500;
+let roll = 1500;
 
 let currentDroneCommand = 'DISARM';
 //ฟังก์ชันสร้างชุดข้อมูลตามฟอร์แมตมาตรฐาน
@@ -103,7 +103,7 @@ function sendActionCommand(commandType) {
     .then(data => {
         // บันทึก Log ลงหน้าจอตามประเภทคำสั่ง
         if (payload.alt!== null) {
-            addLogToHUD(`✅ Sent: ${commandType} (Target Alt: ${payload.alt}m, Spd: ${payload.spd}m/s)`);
+            addLogToHUD(`✅ Sent: ${commandType} `);
         } else {
             addLogToHUD(`✅ Sent: ${commandType} (Direct Action)`);
         }
@@ -156,24 +156,59 @@ function sendDroneStateToDjango() {
     })
     .catch(error => console.error("Error sending state:", error));
 }
-// ตรวจจับตอนกดปุ่มคีย์บอร์ดลงค้างไว้ (KeyDown)
+
+// ตัวแปรเก็บปุ่มคีย์บอร์ดที่ถูกกดค้างไว้
+let keysPressed = {};
+// ทำงานเมื่อโครงสร้างเว็บพร้อมใช้งาน (ผูกสไลเดอร์หน้าจอเข้ากับค่าตัวแปร)
+document.addEventListener('DOMContentLoaded', function() {
+    const throttleSlider = document.getElementById('throttleSlider');
+    const throttleVal = document.getElementById('throttleVal');
+    const throttleInput = document.getElementById('throttleInput');
+
+    if (throttleSlider && throttleInput) {
+        // กรณีเอามือลากสไลเดอร์บนหน้าจอตรงๆ
+        throttleSlider.addEventListener('input', function() {
+            throttle = parseInt(this.value);
+            throttleInput.value = throttle;
+            if (throttleInput) throttleInput.value = throttle;
+            sendDroneStateToDjango();
+        });
+
+        // กรณีใส่ค่าด้วยมือใน input field
+        throttleInput.addEventListener('change', function() {
+            let val = parseInt(this.value);
+            
+            // ป้องกันกรอกค่าแปลกปลอม หรือค่านอกเหนือลิมิต 1300 - 1700
+            if (isNaN(val)) val = 1500;
+            if (val < 1300) val = 1300;
+            if (val > 1700) val = 1700;
+            
+            throttle = val;
+            this.value = throttle; // แสดงค่าที่จัดระเบียบใหม่ในช่องป้อน
+            throttleSlider.value = throttle; // เลื่อนสไลเดอร์ตามจริง
+            if (throttleVal) throttleVal.innerText = throttle;
+            
+            sendDroneStateToDjango();
+        });
+    }
+});
+
+// KeyDown 
 document.addEventListener('keydown', function(event) {
-    let changed = false;
-    const keyLower = event.key.toLowerCase();
     if (!isManualModeActive) {
-        alert("⚠️ Manual control is disabled. Please switch to MANUAL mode first.");
-        return;
+        return; // ปิดการทำงานหากไม่ได้อยู่ในโหมด MANUAL
     }
-    switch(keyLower) {
-        case 'w': throttle = 1; changed = true; break;
-        case 's': throttle = -1; changed = true; break;
-        case 'a': yaw = -1; changed = true; break;
-        case 'd': yaw = 1; changed = true; break;
-        case 'arrowup': pitch = 1; changed = true; event.preventDefault(); break;
-        case 'arrowdown': pitch = -1; changed = true; event.preventDefault(); break;
-        case 'arrowleft': roll = -1; changed = true; event.preventDefault(); break;
-        case 'arrowright': roll = 1; changed = true; event.preventDefault(); break;
-    }
+    const keyLower = event.key.toLowerCase();
+    keysPressed[keyLower] = true; // บันทึกว่าปุ่มนี้ถูกกดค้างไว้
+    let changed = false;
+    // สำหรับปุ่มทิศทางและปุ่มเลี้ยว (กดปุ๊บให้ไปสุดแกน 1300 หรือ 1700 ทันที)
+    if (keyLower === 'a') { yaw = 1300; changed = true; }
+    if (keyLower === 'd') { yaw = 1700; changed = true; }
+    if (keyLower === 'arrowup') { pitch = 1700; changed = true; event.preventDefault(); }
+    if (keyLower === 'arrowdown') { pitch = 1300; changed = true; event.preventDefault(); }
+    if (keyLower === 'arrowleft') { roll = 1300; changed = true; event.preventDefault(); }
+    if (keyLower === 'arrowright') { roll = 1700; changed = true; event.preventDefault(); }
+    // เรืองแสงปุ่มควบคุมจำลองบนหน้าจอ
     const btnId = keyBtnMap[keyLower];
     if (btnId) {
         const targetBtn = document.getElementById(btnId);
@@ -186,19 +221,17 @@ document.addEventListener('keydown', function(event) {
     if (changed) sendDroneStateToDjango();
 });
 
-// ตรวจจับตอนปล่อยนิ้ว (KeyUp)
+// KeyUp
 document.addEventListener('keyup', function(event) {
-    let changed = false;
-
     const keyLower = event.key.toLowerCase();
-    switch(keyLower) {
-        // พอปล่อยปุ่มไหน แกะนั้นจะกลับมาเป็น 0 (นิ่ง) ทันที
-        case 'w': case 's': throttle = 0; changed = true; break;
-        case 'a': case 'd': yaw = 0; changed = true; break;
-        case 'arrowup': case 'arrowdown': pitch = 0; changed = true; break;
-        case 'arrowleft': case 'arrowright': roll = 0; changed = true; break;
-    }
-
+    delete keysPressed[keyLower]; // ลบปุ่มนี้ออกจากรายการกดค้าง
+    let changed = false;
+    // เมื่อปล่อยปุ่มให้สัญญาณเลี้ยวและปุ่มทิศทางดีดกลับมาตรงกลาง (1500)
+    // (สังเกตว่าจะไม่มี 'w' หรือ 's' ในส่วนนี้ เพื่อปล่อยแล้วให้คันเร่งค้างไว้ที่เดิม)
+    if (keyLower === 'a' || keyLower === 'd') { yaw = 1500; changed = true; }
+    if (keyLower === 'arrowup' || keyLower === 'arrowdown') { pitch = 1500; changed = true; }
+    if (keyLower === 'arrowleft' || keyLower === 'arrowright') { roll = 1500; changed = true; }
+    // ดับแสงปุ่มควบคุมจำลองบนหน้าจอ
     const btnId = keyBtnMap[keyLower];
     if (btnId) {
         const targetBtn = document.getElementById(btnId);
@@ -208,10 +241,38 @@ document.addEventListener('keyup', function(event) {
             targetBtn.style.boxShadow = '';
         }
     }
-
     if (changed) sendDroneStateToDjango();
 });
 
+// Loop every 30ms to check if 'w' or 's' is pressed for throttle control
+setInterval(function() {
+    if (!isManualModeActive) return;
+    let throttleChanged = false;
+    
+    // ขยับทีละ 5 หน่วย ทุก ๆ 30ms
+    // ทำให้การเลื่อนจาก 1500 ไปหา 1700 ใช้เวลาประมาณ 1.2 วินาที
+    const throttleStep = 5; 
+    if (keysPressed['w']) {
+        // เพิ่มคันเร่งทีละ 5 จนชนขอบบนที่ 1700
+        throttle = Math.min(1700, throttle + throttleStep);
+        throttleChanged = true;
+    } else if (keysPressed['s']) {
+        // ลดคันเร่งทีละ 5 จนชนขอบล่างที่ 1300
+        throttle = Math.max(1300, throttle - throttleStep);
+        throttleChanged = true;
+    }
+    if (throttleChanged) {
+        // อัปเดตสไลเดอร์และตัวเลขบนหน้าจอให้ขยับเลื่อนตามแบบเรียลไทม์
+        const throttleSlider = document.getElementById('throttleSlider');
+        const throttleVal = document.getElementById('throttleVal');
+        const throttleInput = document.getElementById('throttleInput');
+        if (throttleSlider) throttleSlider.value = throttle;
+        if (throttleInput) throttleInput.value = throttle;
+        if (throttleVal) throttleVal.innerText = throttle;
+        // ยิงคำสั่ง UDP ใหม่ไปบอก Django
+        sendDroneStateToDjango();
+    }
+}, 30);
 
 function addLogToHUD(message, isError = false) {
     const logContainer = document.getElementById('control-logs-container');
