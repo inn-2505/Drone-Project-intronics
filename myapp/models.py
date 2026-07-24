@@ -13,7 +13,7 @@ class DroneStatus(models.Model):
     speed = models.DecimalField(max_digits=5, decimal_places=2, default=0.00) # m/s
     
     # battery status
-    battery_voltage = models.DecimalField(max_digits=4, decimal_places=2, default=0.00) # โวลต์
+    battery_voltage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00) # โวลต์
     battery_percentage = models.IntegerField(default=100) # %
     
     # time when data was recorded in real-time

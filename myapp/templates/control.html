@@ -2,7 +2,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Drone F722 Control Mode</title>
     <link rel="stylesheet" href="{% static 'css/dashboard.css' %}" />
     <link rel="stylesheet" href="{% static 'css/control.css' %}" />
@@ -108,7 +109,7 @@
             </p>
             <div class="dpad-container">
                 <div></div>
-                <input type="range" id="throttleSlider" class="vertical-slider" min="1300" max="1700" value="1500">
+                <input type="range" id="throttleSlider" class="vertical-slider" min="1000" max="2000" value="1500">
                 <div></div>
                 
                 <!-- แถวที่ 2 -->
@@ -119,7 +120,7 @@
 
             <div class="throttle-input-container">
                 <label style="color: #aaa; font-size: 0.85rem; font-weight: 500;">Set Throttle:</label>
-                <input type="number" id="throttleInput" class="throttle-number-input" min="1300" max="1700" value="1500">
+                <input type="number" id="throttleInput" class="throttle-number-input" min="1000" max="2000" value="1500">
 </div>
         </div>
         

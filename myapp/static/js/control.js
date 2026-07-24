@@ -178,10 +178,10 @@ document.addEventListener('DOMContentLoaded', function() {
         throttleInput.addEventListener('change', function() {
             let val = parseInt(this.value);
             
-            // ป้องกันกรอกค่าแปลกปลอม หรือค่านอกเหนือลิมิต 1300 - 1700
+            // ป้องกันกรอกค่าแปลกปลอม หรือค่านอกเหนือลิมิต 1000 - 2000
             if (isNaN(val)) val = 1500;
-            if (val < 1300) val = 1300;
-            if (val > 1700) val = 1700;
+            if (val < 1000) val = 1000;
+            if (val > 2000) val = 2000;
             
             throttle = val;
             this.value = throttle; // แสดงค่าที่จัดระเบียบใหม่ในช่องป้อน
@@ -253,12 +253,12 @@ setInterval(function() {
     // ทำให้การเลื่อนจาก 1500 ไปหา 1700 ใช้เวลาประมาณ 1.2 วินาที
     const throttleStep = 5; 
     if (keysPressed['w']) {
-        // เพิ่มคันเร่งทีละ 5 จนชนขอบบนที่ 1700
-        throttle = Math.min(1700, throttle + throttleStep);
+        // เพิ่มคันเร่งทีละ 5 จนชนขอบบนที่ 2000
+        throttle = Math.min(2000, throttle + throttleStep);
         throttleChanged = true;
     } else if (keysPressed['s']) {
-        // ลดคันเร่งทีละ 5 จนชนขอบล่างที่ 1300
-        throttle = Math.max(1300, throttle - throttleStep);
+        // ลดคันเร่งทีละ 5 จนชนขอบล่างที่ 1000
+        throttle = Math.max(1000, throttle - throttleStep);
         throttleChanged = true;
     }
     if (throttleChanged) {
